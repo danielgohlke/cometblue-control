@@ -7,6 +7,7 @@ Wants=bluetooth.target
 Type=simple
 User={{ service_user }}
 WorkingDirectory={{ install_dir }}
+ExecStartPre=/usr/sbin/rfkill unblock bluetooth
 ExecStart={{ install_dir }}/.venv/bin/cometblue-control serve
 Restart=on-failure
 RestartSec=10

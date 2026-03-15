@@ -37,6 +37,10 @@
         insertafter: "^\\[Policy\\]"
       tags: [setup]
 
+    - name: Bluetooth rfkill-Softblock aufheben
+      command: rfkill unblock bluetooth
+      tags: [setup]
+
     - name: Bluetooth-Service aktivieren
       systemd:
         name: bluetooth
