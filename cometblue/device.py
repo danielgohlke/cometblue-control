@@ -84,39 +84,43 @@ class CometBlueDevice:
 
     async def __aenter__(self) -> "CometBlueDevice":
         await _ble_lock.acquire()
-        kwargs = {"timeout": CONNECT_TIMEOUT}
-        if self._adapter:
-            kwargs["adapter"] = self._adapter
         try:
-            self._client = BleakClient(self.address, **kwargs)
-            # Use cached GATT services if BlueZ already knows the device.
-            # On Pi 3B+, fresh service discovery takes ~30s which can exceed
-            # the CometBlue device's unauthenticated-connection timeout.
-            await self._client.connect(dangerous_use_bleak_cache=True)
-        except BleakError as e:
-            # Device not found + we have a stored MAC → try to resolve new UUID (e.g. after battery swap)
-            if self._mac_address and "not found" in str(e).lower():
-                log.info(
-                    "Device %s not found, attempting MAC-based rediscovery (MAC=%s)...",
-                    self.address, self._mac_address,
-                )
-                from .discovery import find_by_mac
-                found = await find_by_mac(self._mac_address, pin=self.pin, adapter=self._adapter)
-                if found:
+            kwargs = {"timeout": CONNECT_TIMEOUT}
+            if self._adapter:
+                kwargs["adapter"] = self._adapter
+            try:
+                self._client = BleakClient(self.address, **kwargs)
+                # Use cached GATT services if BlueZ already knows the device.
+                # On Pi 3B+, fresh service discovery takes ~30s which can exceed
+                # the CometBlue device's unauthenticated-connection timeout.
+                await self._client.connect(dangerous_use_bleak_cache=True)
+            except BleakError as e:
+                # Device not found + we have a stored MAC → try to resolve new UUID (e.g. after battery swap)
+                if self._mac_address and "not found" in str(e).lower():
                     log.info(
-                        "Resolved address via MAC %s: %s → %s",
-                        self._mac_address, self.address, found.address,
+                        "Device %s not found, attempting MAC-based rediscovery (MAC=%s)...",
+                        self.address, self._mac_address,
                     )
-                    self.address = found.address
-                    self._client = BleakClient(self.address, **kwargs)
-                    await self._client.connect(dangerous_use_bleak_cache=True)
+                    from .discovery import find_by_mac
+                    found = await find_by_mac(self._mac_address, pin=self.pin, adapter=self._adapter)
+                    if found:
+                        log.info(
+                            "Resolved address via MAC %s: %s → %s",
+                            self._mac_address, self.address, found.address,
+                        )
+                        self.address = found.address
+                        self._client = BleakClient(self.address, **kwargs)
+                        await self._client.connect(dangerous_use_bleak_cache=True)
+                    else:
+                        raise
                 else:
                     raise
-            else:
-                raise
-        if self.pin is not None:
-            await self._authenticate()
-        return self
+            if self.pin is not None:
+                await self._authenticate()
+            return self
+        except:
+            _ble_lock.release()
+            raise
 
     async def __aexit__(self, *args):
         try:
