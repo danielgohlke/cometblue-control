@@ -92,6 +92,14 @@ async def apply_profile(name: str, body: models.ProfileApply):
                         for idx, day_name in enumerate(DAY_NAMES, start=1):
                             if day_name in schedules:
                                 await dev.set_day_schedule(idx, schedules[day_name])
+                # Update DB cache so dashboard reflects new values immediately
+                cached = await db.get_status(address) or {}
+                if profile_data.get("comfort_temp") is not None:
+                    cached["temp_comfort"] = profile_data["comfort_temp"]
+                if profile_data.get("eco_temp") is not None:
+                    cached["temp_eco"] = profile_data["eco_temp"]
+                if cached:
+                    await db.save_status(address, cached)
                 result_status = "ok"
             except Exception as e:
                 result_status = str(e)

@@ -36,7 +36,7 @@ def list_profiles() -> list[str]:
 
 def load_profile(name: str) -> dict:
     d = _profiles_dir()
-    path = d / f"{name}.yaml"
+    path = d / f"{name.lower()}.yaml"
     if not path.exists():
         raise FileNotFoundError(f"Profile '{name}' not found in {d}")
     with open(path) as f:
@@ -45,7 +45,7 @@ def load_profile(name: str) -> dict:
 
 def save_profile(name: str, data: dict):
     d = _profiles_dir()
-    path = d / f"{name}.yaml"
+    path = d / f"{name.lower()}.yaml"
     with open(path, "w") as f:
         yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
     log.info("Profile '%s' saved to %s", name, path)
@@ -53,7 +53,7 @@ def save_profile(name: str, data: dict):
 
 def delete_profile(name: str):
     d = _profiles_dir()
-    path = d / f"{name}.yaml"
+    path = d / f"{name.lower()}.yaml"
     if not path.exists():
         raise FileNotFoundError(f"Profile '{name}' not found")
     path.unlink()
