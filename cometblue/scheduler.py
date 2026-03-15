@@ -67,8 +67,16 @@ async def _poll_all_devices():
         log.debug("No devices configured, skipping poll")
         return
     log.info("Polling %d device(s)...", len(devices))
-    tasks = [_poll_single(d["address"]) for d in devices]
-    await asyncio.gather(*tasks, return_exceptions=True)
+    # Poll sequentially — BLE adapter can only handle one connection at a time.
+    # A hard per-device timeout prevents one stuck device from blocking the rest.
+    per_device_timeout = 120  # generous: connect(45s) + reads + EOFError reset(10s)
+    for device in devices:
+        try:
+            await asyncio.wait_for(_poll_single(device["address"]), timeout=per_device_timeout)
+        except asyncio.TimeoutError:
+            log.error("Poll timed out (>%ds) for %s — skipping", per_device_timeout, device["address"])
+        except Exception as e:
+            log.error("Unexpected error in poll cycle for %s: %s", device["address"], e)
 
 
 async def _poll_single(address: str):
