@@ -1648,12 +1648,14 @@ function app() {
       this.tempMsg = '';
       this.tempSaving = false;
       this.tempForm = {comfort: '', eco: '', offset: '', child_lock: dev.status?.child_lock ?? false};
-      this._bleLock('Verbindung wird geprüft…', dev.address);
 
-      if (dev.pin != null) {
+      // Only test PIN via BLE if the last poll showed an auth failure.
+      // Testing PIN on every open requires a full BLE connection (~45s on Pi 3B+).
+      if (dev.pin != null && dev.status?.error?.startsWith('auth_failed')) {
+        this._bleLock('PIN wird geprüft…', dev.address);
         const valid = await this._testStoredPin(dev.address);
+        this._bleUnlock(dev.address);
         if (!valid) {
-          this._bleUnlock(dev.address);
           this._pendingTempOpen = true;
           this._openPinPrompt();
           return;
