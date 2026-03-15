@@ -58,7 +58,7 @@ All of the following devices share the same BLE protocol and are fully supported
 ### Quick install (recommended)
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/cometblue-control
+git clone https://github.com/danielgohlke/cometblue-control
 cd cometblue-control
 
 # Core + API + Web UI (no extra dependencies needed):
@@ -474,7 +474,7 @@ sudo apt update && sudo apt install -y bluetooth bluez python3 python3-venv git
 sudo systemctl enable bluetooth && sudo systemctl start bluetooth
 
 # 3. Clone and install
-git clone https://github.com/YOUR_GITHUB_USERNAME/cometblue-control
+git clone https://github.com/danielgohlke/cometblue-control
 cd cometblue-control
 ./install.sh --with-mcp --systemd
 
