@@ -1048,15 +1048,24 @@
       <button @click="applyProfileTargets = []" class="text-gray-500 hover:underline">Keine</button>
     </div>
 
-    <!-- Progress bar -->
-    <div x-show="applyProfileApplying || (applyProfileProgress.total > 0)" class="mb-3">
-      <div class="flex justify-between text-xs text-gray-500 mb-1">
-        <span x-text="'Gerät ' + applyProfileProgress.done + ' / ' + applyProfileProgress.total"></span>
-        <span x-text="applyProfileProgress.total ? Math.round((applyProfileProgress.done / applyProfileProgress.total) * 100) + '%' : ''"></span>
+    <!-- Terminal log + progress bar -->
+    <div x-show="applyProfileLog.length > 0" class="mb-3">
+      <div class="bg-gray-900 rounded-lg px-3 py-2 font-mono text-xs max-h-28 overflow-y-auto space-y-0.5"
+        id="applyProfileLogEl">
+        <template x-for="(line, i) in applyProfileLog" :key="i">
+          <div :class="line.type === 'ok' ? 'text-green-400' : line.type === 'error' ? 'text-red-400' : 'text-blue-300'"
+            x-text="line.text"></div>
+        </template>
       </div>
-      <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-        <div class="progress-bar h-2 bg-blue-500 rounded-full"
-          :style="'width:' + (applyProfileProgress.total ? Math.round((applyProfileProgress.done / applyProfileProgress.total) * 100) : 0) + '%'"></div>
+      <div x-show="applyProfileProgress.total > 0" class="mt-2">
+        <div class="flex justify-between text-xs text-gray-400 mb-1">
+          <span x-text="applyProfileProgress.done + ' / ' + applyProfileProgress.total + ' Geräte'"></span>
+          <span x-text="applyProfileProgress.total ? Math.round((applyProfileProgress.done / applyProfileProgress.total) * 100) + '%' : ''"></span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+          <div class="progress-bar h-1.5 bg-blue-500 rounded-full"
+            :style="'width:' + (applyProfileProgress.total ? Math.round((applyProfileProgress.done / applyProfileProgress.total) * 100) : 0) + '%'"></div>
+        </div>
       </div>
     </div>
 
@@ -1283,6 +1292,7 @@ function app() {
     applyProfileApplying: false,
     applyProfileResults: {},
     applyProfileProgress: {done: 0, total: 0},
+    applyProfileLog: [],
     toast: '',
 
     // ─────────────────────────────────────────────────────────────
@@ -2136,6 +2146,7 @@ function app() {
       this.applyProfileApplying = false;
       this.applyProfileResults = {};
       this.applyProfileProgress = {done: 0, total: 0};
+      this.applyProfileLog = [];
       this.showApplyProfile = true;
     },
 
@@ -2144,6 +2155,7 @@ function app() {
       this.applyProfileApplying = true;
       this.applyProfileResults = {};
       this.applyProfileProgress = {done: 0, total: this.applyProfileTargets.length};
+      this.applyProfileLog = [];
 
       const res = await fetch(`${API}/api/profiles/${encodeURIComponent(this.applyProfileName)}/apply`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -2169,9 +2181,20 @@ function app() {
               const payload = JSON.parse(data);
               if (event === 'progress') {
                 this.applyProfileResults = {...this.applyProfileResults, [payload.address]: 'applying'};
+                const devName = this.devices.find(d => d.address === payload.address)?.name || payload.address.substring(0,8);
+                this.applyProfileLog = [...this.applyProfileLog, {text: `→ Wird angewendet: ${devName}…`, type: 'info'}];
+                this.$nextTick(() => { const el = document.getElementById('applyProfileLogEl'); if (el) el.scrollTop = el.scrollHeight; });
               } else if (event === 'result') {
                 this.applyProfileResults = {...this.applyProfileResults, [payload.address]: payload.status};
                 this.applyProfileProgress = {...this.applyProfileProgress, done: this.applyProfileProgress.done + 1};
+                const devName = this.devices.find(d => d.address === payload.address)?.name || payload.address.substring(0,8);
+                const log = [...this.applyProfileLog];
+                const resultLine = payload.status === 'ok'
+                  ? {text: `✓ ${devName}`, type: 'ok'}
+                  : {text: `✗ ${devName}: ${payload.status}`, type: 'error'};
+                if (log.length > 0) log[log.length - 1] = resultLine; else log.push(resultLine);
+                this.applyProfileLog = log;
+                this.$nextTick(() => { const el = document.getElementById('applyProfileLogEl'); if (el) el.scrollTop = el.scrollHeight; });
               }
             } catch {}
             event = ''; data = '';
