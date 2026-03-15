@@ -59,8 +59,17 @@ async def set_temperatures(address: str, body: models.TemperaturesSet):
     except Exception as e:
         raise HTTPException(502, f"BLE error: {e}")
 
-    # Poll immediately so the UI reflects the new values without waiting for the next cycle
-    await trigger_poll_now(address)
+    # Update DB directly so the UI reflects the new values immediately,
+    # without a second BLE connection (which is expensive on Pi 3B+).
+    status = await db.get_status(address) or {}
+    if body.comfort is not None:
+        status["temp_comfort"] = body.comfort
+    if body.eco is not None:
+        status["temp_eco"] = body.eco
+    if body.offset is not None:
+        status["temp_offset"] = body.offset
+    if status:
+        await db.save_status(address, status)
 
     return {"status": "ok", "address": address}
 
