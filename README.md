@@ -1,8 +1,12 @@
 # CometBlue Control
 
-Cross-platform management system for **CometBlue / Comet Blue** Bluetooth Low Energy radiator thermostats. Runs on macOS, Linux, and Raspberry Pi.
+Cross-platform management system for **CometBlue / Comet Blue**, **Xavax Hama**, and **Sygonix HT100 BT** Bluetooth Low Energy radiator thermostats. Runs on macOS, Linux, and Raspberry Pi.
 
 Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI — all from a single Python package.
+
+> **Compatible devices:** Comet Blue · Xavax Hama · Sygonix HT100 BT (all share the same BLE protocol)
+
+> **Web UI language:** English / German switchable in the nav bar
 
 ---
 
@@ -26,6 +30,20 @@ Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI �
 
 ---
 
+## Compatible Devices
+
+All of the following devices share the same BLE protocol and are fully supported:
+
+| Brand | Model |
+|-------|-------|
+| EUROtronic | Comet Blue |
+| Hama | Xavax (Article 00176592) |
+| Sygonix | HT100 BT |
+
+> There are likely other rebranded versions of the same hardware. If yours works, please open an issue to add it to this list.
+
+---
+
 ## Requirements
 
 - Python 3.10+
@@ -40,7 +58,7 @@ Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI �
 ### Quick install (recommended)
 
 ```bash
-git clone https://github.com/yourname/cometblue-control
+git clone https://github.com/YOUR_GITHUB_USERNAME/cometblue-control
 cd cometblue-control
 
 # Core + API + Web UI (no extra dependencies needed):
@@ -164,7 +182,7 @@ Start the server and open **http://localhost:8080**.
 | **Monitor** | Temperature + battery history chart (dual Y-axis) per device |
 | **Devices** | Full device list — poll, set temps, schedules, child lock, rename, reset data |
 | **Profiles** | View, create, edit and apply heating profiles with schedule and child lock settings |
-| **Szenen** | Named scenes: assign one profile per device, apply all at once with live progress bar |
+| **Scenes** | Named scenes: assign one profile per device, apply all at once with live progress bar |
 | **Discovery** | BLE scan, add found devices with one click |
 
 ### Nav bar
@@ -197,7 +215,7 @@ A scene stores a mapping of device → profile. Applying a scene writes each pro
 
 **Example use case:** "Winter" scene → Wohnzimmer=winter, Schlafzimmer=winter, Bad=winter, Küche=spring.
 
-Scenes are managed in the **Szenen** tab of the Web UI or via the REST API.
+Scenes are managed in the **Scenes** tab of the Web UI or via the REST API.
 
 ---
 
@@ -456,7 +474,7 @@ sudo apt update && sudo apt install -y bluetooth bluez python3 python3-venv git
 sudo systemctl enable bluetooth && sudo systemctl start bluetooth
 
 # 3. Clone and install
-git clone https://github.com/yourname/cometblue-control
+git clone https://github.com/YOUR_GITHUB_USERNAME/cometblue-control
 cd cometblue-control
 ./install.sh --with-mcp --systemd
 
@@ -474,17 +492,17 @@ Access the UI from another device: `http://<raspberry-pi-ip>:8080`
 
 The `deploy/` directory contains an Ansible playbook for automated deployment to a Raspberry Pi.
 
-**Prerequisites (on your Mac):**
+**Prerequisites:**
 ```bash
 pip install ansible
 # SSH key auth must be set up (no password prompt)
-ssh-copy-id drg@raspberry.local
+ssh-copy-id USER@raspberry.local
 ```
 
 **Configure inventory** (`deploy/inventory.ini`):
 ```ini
 [cometblue]
-raspberrypi ansible_host=raspberry.local ansible_user=pi
+raspberrypi ansible_host=raspberry.local ansible_user=YOUR_USER
 ```
 
 **First deploy** (installs all packages, creates venv, sets up systemd service):
@@ -507,7 +525,7 @@ What the playbook does:
 
 **Check service status on the Pi:**
 ```bash
-ssh drg@raspberry.local "journalctl -u cometblue -f"
+ssh USER@raspberry.local "journalctl -u cometblue -f"
 ```
 
 ### Service logs
@@ -705,10 +723,31 @@ Deleting a device only removes it from the `devices` table — history and statu
 
 ---
 
-## Sources
+## Credits & Sources
 
-- Original Python library: https://github.com/im-0/cometblue
-- BLE protocol documentation: https://www.torsten-traenkner.de/wissen/smarthome/heizung.php
+This project would not have been possible without:
+
+- **Torsten Tränkner** — comprehensive BLE protocol documentation for CometBlue / Xavax Hama / Sygonix HT100 BT:
+  https://www.torsten-traenkner.de/wissen/smarthome/heizung.php
+
+- **im-0/cometblue** — original Python library (Linux/gattlib):
+  https://github.com/im-0/cometblue
+
+- **bleak** — cross-platform BLE library used by this project:
+  https://github.com/hbldh/bleak
+
+---
+
+## Contributing
+
+Pull requests are welcome! Please open an issue first for larger changes.
+
+Tested devices:
+- Comet Blue (EUROtronic)
+- Xavax Hama
+- Sygonix HT100 BT
+
+If you have a different device that works (or doesn't work), please open an issue so we can update the compatibility list.
 
 ---
 

@@ -35,8 +35,8 @@
     <template x-for="tab in ['dashboard','monitor','devices','profiles','szenen','discovery']" :key="tab">
       <button @click="page=tab; localStorage.setItem('cb_page',tab); onPageChange(tab)"
         :class="page===tab ? 'border-b-2 border-white bg-blue-800' : 'opacity-70 hover:opacity-100'"
-        class="relative px-3 py-1 text-sm font-medium rounded-t capitalize">
-        <span x-text="tab"></span>
+        class="relative px-3 py-1 text-sm font-medium rounded-t">
+        <span x-text="t('nav_tab_' + tab)"></span>
         <span x-show="tab === 'dashboard' && alerts.length > 0"
           class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center leading-none"
           x-text="alerts.length"></span>
@@ -45,15 +45,15 @@
     <div class="ml-auto flex items-center gap-3">
       <span class="text-xs opacity-60" x-text="status.next_poll && autoPoll ? 'Next poll: ' + fmtTime(status.next_poll) : ''"></span>
       <button @click="pollAll()" :disabled="pollingAll"
-        title="Alle Geräte sofort abfragen"
+        :title="t('nav_title_poll')"
         class="flex items-center gap-1 text-xs px-2 py-0.5 rounded transition-all"
         :class="pollingAll ? 'bg-blue-800 opacity-70 cursor-not-allowed' : 'opacity-60 hover:opacity-100 hover:bg-blue-800'">
         <svg :class="pollingAll ? 'animate-spin' : ''" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-        <span x-text="pollingAll ? 'Polling…' : 'Poll all'"></span>
+        <span x-text="pollingAll ? t('nav_polling') : t('nav_poll_all')"></span>
       </button>
       <!-- Auto-Poll Toggle -->
-      <label class="flex items-center gap-1.5 cursor-pointer" title="Automatisches Polling ein-/ausschalten">
-        <span class="text-xs" :class="autoPoll ? 'text-green-300' : 'text-white opacity-40'">Auto-Poll</span>
+      <label class="flex items-center gap-1.5 cursor-pointer" :title="t('nav_title_autopoll')">
+        <span class="text-xs" :class="autoPoll ? 'text-green-300' : 'text-white opacity-40'" x-text="t('nav_auto_poll')"></span>
         <button @click="toggleAutoPoll()"
           class="relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none"
           :class="autoPoll ? 'bg-green-500' : 'bg-gray-500'">
@@ -61,7 +61,11 @@
             :class="autoPoll ? 'translate-x-4' : 'translate-x-0'"></span>
         </button>
       </label>
-      <button @click="debugMode=!debugMode" title="Debug-Modus"
+      <button @click="setLang(lang === 'de' ? 'en' : 'de')"
+        :title="lang === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'"
+        class="text-xs px-2 py-0.5 rounded font-mono transition-all opacity-60 hover:opacity-100 hover:bg-blue-800"
+        x-text="lang === 'de' ? 'EN' : 'DE'"></button>
+      <button @click="debugMode=!debugMode" :title="t('nav_title_debug')"
         :class="debugMode ? 'bg-yellow-400 text-yellow-900' : 'opacity-40 hover:opacity-70 text-white'"
         class="text-xs px-2 py-0.5 rounded font-mono transition-all">DBG</button>
     </div>
@@ -87,9 +91,9 @@
 
   <!-- ══════════════════ DASHBOARD ══════════════════ -->
   <div x-show="page === 'dashboard'">
-    <h1 class="text-2xl font-bold mb-4">Dashboard</h1>
+    <h1 class="text-2xl font-bold mb-4" x-text="t('dashboard_title')"></h1>
     <div x-show="devices.length === 0" class="text-gray-500 italic">
-      No devices configured. Go to <button @click="page='discovery'" class="text-blue-600 underline">Discover</button>.
+      <span x-text="t('dashboard_no_devices')"></span> <button @click="page='discovery'" class="text-blue-600 underline" x-text="t('dashboard_discover_link')"></button>.
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <template x-for="dev in devices" :key="dev.address">
@@ -113,7 +117,7 @@
               <div x-show="dev.mac_address" class="text-xs text-blue-500 font-mono" x-text="'MAC: ' + dev.mac_address"></div>
             </div>
             <div class="text-right flex-shrink-0 ml-2">
-              <div x-show="dev.status?.battery != null" class="text-xs text-gray-500" title="CometBlue-Batteriewert: Neue Batterien zeigen ~80–90% (nicht 100%), da das Gerät die Rohspannung ohne Kalibrierung ausgibt.">🔋 <span x-text="dev.status?.battery + '%'"></span></div>
+              <div x-show="dev.status?.battery != null" class="text-xs text-gray-500" :title="t('battery_tooltip')">🔋 <span x-text="dev.status?.battery + '%'"></span></div>
               <div class="text-xs"
                 :class="dev.status?.error ? 'text-red-500' : (dev.status?.polled_at ? 'text-green-500' : 'text-gray-400')"
                 x-text="dev.status?.error
@@ -138,25 +142,25 @@
           <div x-show="dev.status && (dev.status.temp_current != null || dev.status.temp_comfort != null)" class="mt-3 space-y-1"
             :class="dev.status?.error ? 'opacity-60' : ''">
             <div class="flex justify-between">
-              <span class="text-sm text-gray-500">Aktuell</span>
+              <span class="text-sm text-gray-500" x-text="t('dash_temp_current')"></span>
               <span class="font-bold text-blue-600" x-text="fmt(dev.status?.temp_current) + ' °C'"></span>
             </div>
             <div class="flex justify-between">
-              <span class="text-sm text-gray-500">Heizen</span>
+              <span class="text-sm text-gray-500" x-text="t('dash_temp_comfort')"></span>
               <span class="font-semibold text-orange-600" x-text="fmt(dev.status?.temp_comfort) + ' °C'"></span>
             </div>
             <div class="flex justify-between">
-              <span class="text-sm text-gray-500">Absenken</span>
+              <span class="text-sm text-gray-500" x-text="t('dash_temp_eco')"></span>
               <span class="text-sm text-blue-500" x-text="fmt(dev.status?.temp_eco) + ' °C'"></span>
             </div>
             <div x-show="dev.status?.child_lock != null" class="flex justify-between items-center">
-              <span class="text-sm text-gray-500">Kindersicherung</span>
+              <span class="text-sm text-gray-500" x-text="t('dash_child_lock')"></span>
               <button @click="toggleChildLock(dev)"
                 :disabled="busyDevices[dev.address]"
-                :title="dev.status?.child_lock ? 'Kindersicherung deaktivieren' : 'Kindersicherung aktivieren'"
+                :title="dev.status?.child_lock ? t('dash_child_lock_disable') : t('dash_child_lock_enable')"
                 class="text-sm font-medium px-2 py-0.5 rounded transition-colors"
                 :class="dev.status?.child_lock ? 'text-orange-600 hover:bg-orange-50' : 'text-gray-400 hover:bg-gray-100'">
-                <span x-text="dev.status?.child_lock ? '🔒 AN' : '🔓 AUS'"></span>
+                <span x-text="dev.status?.child_lock ? t('dash_child_lock_on') : t('dash_child_lock_off')"></span>
               </button>
             </div>
             <!-- Debug section -->
@@ -181,15 +185,13 @@
               x-text="(dev.status?.error || '').replace(/^(auth_failed|ble_error): /, '')"></div>
             <button x-show="dev.status?.error?.includes('not found') && dev.mac_address"
               @click="rediscoverDevice(dev)"
-              class="mt-2 w-full text-xs bg-orange-100 text-orange-700 border border-orange-200 rounded px-2 py-1 hover:bg-orange-200">
-              🔍 Neu suchen (UUID aktualisieren)
+              class="mt-2 w-full text-xs bg-orange-100 text-orange-700 border border-orange-200 rounded px-2 py-1 hover:bg-orange-200"
+              x-text="t('dash_rediscover')">
             </button>
           </div>
 
           <!-- Never polled state -->
-          <div x-show="!dev.status" class="mt-3 text-sm text-gray-400 italic">
-            Never polled. Press <strong>Poll</strong> to fetch data.
-          </div>
+          <div x-show="!dev.status" class="mt-3 text-sm text-gray-400 italic" x-text="t('dash_never_polled')"></div>
 
           <!-- BLE busy status strip -->
           <div x-show="busyDevices[dev.address]" class="mt-2 mb-1 flex items-center gap-1.5 text-xs text-blue-500">
@@ -201,9 +203,9 @@
           </div>
           <div class="mt-3 flex flex-wrap gap-2">
             <button @click="openSetTemp(dev)" :disabled="!!busyDevices[dev.address]"
-              class="flex-1 text-sm bg-blue-600 text-white rounded px-3 py-1 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">🌡 Temperaturen</button>
+              class="flex-1 text-sm bg-blue-600 text-white rounded px-3 py-1 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" x-text="t('dash_btn_temps')"></button>
             <button @click="openSchedule(dev)" :disabled="!!busyDevices[dev.address]"
-              class="flex-1 text-sm bg-green-600 text-white rounded px-3 py-1 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">⏰ Heizzeiten</button>
+              class="flex-1 text-sm bg-green-600 text-white rounded px-3 py-1 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed" x-text="t('dash_btn_schedule')"></button>
           </div>
           <div class="mt-1.5 flex gap-2">
             <button @click="pollDevice(dev.address)" :disabled="!!pollingDevices[dev.address] || !!busyDevices[dev.address]"
@@ -212,7 +214,7 @@
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
               </svg>
-              <span x-text="pollingDevices[dev.address] ? 'Polling…' : '↻ Poll'"></span>
+              <span x-text="pollingDevices[dev.address] ? t('dash_btn_polling') : t('dash_btn_poll')"></span>
             </button>
             <button @click="openFixPin(dev)" :disabled="!!busyDevices[dev.address]"
               class="text-sm bg-yellow-100 text-yellow-800 rounded px-3 py-1 hover:bg-yellow-200 disabled:opacity-50">🔑 PIN</button>
@@ -225,9 +227,9 @@
   <!-- ══════════════════ MONITOR ══════════════════ -->
   <div x-show="page === 'monitor'">
     <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">Temperature Monitor</h1>
+      <h1 class="text-2xl font-bold" x-text="t('monitor_title')"></h1>
       <div class="flex items-center gap-2">
-        <span class="text-sm text-gray-500">Range:</span>
+        <span class="text-sm text-gray-500" x-text="t('monitor_range')"></span>
         <template x-for="h in [1,6,24,72,168]" :key="h">
           <button @click="monitorHours=h; loadMonitor()"
             :class="monitorHours===h ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border hover:bg-gray-50'"
@@ -242,12 +244,10 @@
 
     <div x-show="monitorLoading" class="flex justify-center py-16 text-gray-400 gap-2">
       <svg class="spinner w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-      Loading history…
+      <span x-text="t('monitor_loading')"></span>
     </div>
 
-    <div x-show="!monitorLoading && devices.length === 0" class="text-gray-400 italic">
-      No devices configured yet.
-    </div>
+    <div x-show="!monitorLoading && devices.length === 0" class="text-gray-400 italic" x-text="t('monitor_no_devices')"></div>
 
     <div x-show="!monitorLoading" class="space-y-6">
       <template x-for="dev in devices" :key="dev.address">
@@ -259,9 +259,9 @@
             </div>
             <div class="text-right text-sm">
               <div x-show="dev.status?.temp_current != null">
-                Aktuell: <span class="font-bold text-blue-600" x-text="fmt(dev.status?.temp_current) + ' °C'"></span>
+                <span x-text="t('dash_temp_current')"></span>: <span class="font-bold text-blue-600" x-text="fmt(dev.status?.temp_current) + ' °C'"></span>
               </div>
-              <div x-show="dev.status?.battery != null" class="text-xs text-gray-400" title="CometBlue-Batteriewert: Neue Batterien zeigen ~80–90% (nicht 100%), da das Gerät die Rohspannung ohne Kalibrierung ausgibt.">
+              <div x-show="dev.status?.battery != null" class="text-xs text-gray-400" :title="t('battery_tooltip')">
                 🔋 <span x-text="dev.status?.battery + '%'"></span>
               </div>
             </div>
@@ -270,8 +270,8 @@
           <div class="relative h-56">
             <canvas :id="'chart-' + dev.address"></canvas>
             <div x-show="!monitorData[dev.address]?.length"
-              class="absolute inset-0 flex items-center justify-center text-gray-300 text-sm">
-              No data yet — waiting for first poll
+              class="absolute inset-0 flex items-center justify-center text-gray-300 text-sm"
+              x-text="t('monitor_no_data')">
             </div>
           </div>
         </div>
@@ -282,20 +282,20 @@
   <!-- ══════════════════ DEVICES ══════════════════ -->
   <div x-show="page === 'devices'">
     <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-      <h1 class="text-2xl font-bold">Devices</h1>
+      <h1 class="text-2xl font-bold" x-text="t('devices_title')"></h1>
       <div class="flex items-center gap-2">
         <button @click="setChildLockAll(true)" :disabled="childLockBusy"
-          title="Kindersicherung für alle Geräte aktivieren"
+          :title="t('devices_lock_all_title')"
           class="flex items-center gap-1 text-xs px-3 py-1.5 rounded border border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50 transition-colors">
           <svg x-show="childLockBusy" class="spinner w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-          🔒 Alle sperren
+          <span x-text="t('devices_lock_all')"></span>
         </button>
         <button @click="setChildLockAll(false)" :disabled="childLockBusy"
-          title="Kindersicherung für alle Geräte deaktivieren"
-          class="flex items-center gap-1 text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors">
-          🔓 Alle entsperren
+          :title="t('devices_unlock_all_title')"
+          class="flex items-center gap-1 text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          x-text="t('devices_unlock_all')">
         </button>
-        <button @click="showAddDevice=true" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">+ Add Device</button>
+        <button @click="showAddDevice=true" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" x-text="t('devices_add_btn')"></button>
       </div>
     </div>
 
@@ -303,12 +303,12 @@
       <table class="w-full text-sm">
         <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
           <tr>
-            <th class="px-4 py-3 text-left">Name</th>
-            <th class="px-4 py-3 text-left">Adresse</th>
-            <th class="px-4 py-3 text-left">Aktuell °C</th>
-            <th class="px-4 py-3 text-left">Batterie</th>
-            <th class="px-4 py-3 text-left">Zuletzt gesehen</th>
-            <th class="px-4 py-3 text-left">Aktionen</th>
+            <th class="px-4 py-3 text-left" x-text="t('devices_col_name')"></th>
+            <th class="px-4 py-3 text-left" x-text="t('devices_col_address')"></th>
+            <th class="px-4 py-3 text-left" x-text="t('devices_col_temp')"></th>
+            <th class="px-4 py-3 text-left" x-text="t('devices_col_battery')"></th>
+            <th class="px-4 py-3 text-left" x-text="t('devices_col_seen')"></th>
+            <th class="px-4 py-3 text-left" x-text="t('devices_col_actions')"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -324,29 +324,29 @@
               </td>
               <td class="px-4 py-3 font-mono text-xs text-gray-500" x-text="fmtAddr(dev.address)" :title="dev.address"></td>
               <td class="px-4 py-3" x-text="fmt(dev.status?.temp_current)"></td>
-              <td class="px-4 py-3" title="CometBlue-Batteriewert: Neue Batterien zeigen ~80–90% (nicht 100%), da das Gerät die Rohspannung ohne Kalibrierung ausgibt." x-text="dev.status?.battery != null ? dev.status.battery + '%' : '—'"></td>
+              <td class="px-4 py-3" :title="t('battery_tooltip')" x-text="dev.status?.battery != null ? dev.status.battery + '%' : '—'"></td>
               <td class="px-4 py-3 text-xs text-gray-400" x-text="dev.last_seen ? fmtDate(dev.last_seen) : '—'"></td>
               <td class="px-4 py-3">
                 <div class="flex gap-3">
-                  <button @click="openSetTemp(dev)" class="text-blue-600 hover:underline">Temps</button>
+                  <button @click="openSetTemp(dev)" class="text-blue-600 hover:underline" x-text="t('devices_action_temps')"></button>
                   <button @click="pollDevice(dev.address)" :disabled="!!pollingDevices[dev.address]"
                     class="text-gray-500 hover:underline disabled:opacity-40 flex items-center gap-1">
                     <svg x-show="!!pollingDevices[dev.address]" class="spinner w-3 h-3" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                     </svg>
-                    <span x-text="pollingDevices[dev.address] ? 'Polling…' : 'Poll'"></span>
+                    <span x-text="pollingDevices[dev.address] ? t('devices_action_polling') : t('devices_action_poll')"></span>
                   </button>
                   <button @click="openFixPin(dev)" class="text-yellow-600 hover:underline" title="Set/update PIN">
                     PIN <span x-text="dev.pin != null ? '(' + dev.pin + ')' : ''"></span>
                   </button>
-                  <button @click="removeDevice(dev.address)" class="text-red-500 hover:underline">Remove</button>
+                  <button @click="removeDevice(dev.address)" class="text-red-500 hover:underline" x-text="t('devices_action_remove')"></button>
                 </div>
               </td>
             </tr>
           </template>
           <tr x-show="devices.length === 0">
-            <td colspan="6" class="px-4 py-8 text-center text-gray-400">No devices. Add one or use Discover.</td>
+            <td colspan="6" class="px-4 py-8 text-center text-gray-400" x-text="t('devices_no_devices')"></td>
           </tr>
         </tbody>
       </table>
@@ -356,8 +356,8 @@
   <!-- ══════════════════ PROFILES ══════════════════ -->
   <div x-show="page === 'profiles'">
     <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">Heating Profiles</h1>
-      <button @click="openNewProfile()" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">+ New Profile</button>
+      <h1 class="text-2xl font-bold" x-text="t('profiles_title')"></h1>
+      <button @click="openNewProfile()" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" x-text="t('profiles_new_btn')"></button>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <template x-for="p in profiles" :key="p.name">
@@ -369,12 +369,12 @@
             </button>
           </div>
           <div class="space-y-1 text-sm text-gray-600 mb-3">
-            <div class="flex justify-between"><span>Heizen</span>   <span class="font-medium text-orange-600" x-text="p.comfort_temp != null ? p.comfort_temp + ' °C' : '—'"></span></div>
-            <div class="flex justify-between"><span>Absenken</span> <span class="font-medium text-blue-500"   x-text="p.eco_temp     != null ? p.eco_temp     + ' °C' : '—'"></span></div>
+            <div class="flex justify-between"><span x-text="t('profiles_comfort')"></span>   <span class="font-medium text-orange-600" x-text="p.comfort_temp != null ? p.comfort_temp + ' °C' : '—'"></span></div>
+            <div class="flex justify-between"><span x-text="t('profiles_eco')"></span> <span class="font-medium text-blue-500"   x-text="p.eco_temp     != null ? p.eco_temp     + ' °C' : '—'"></span></div>
           </div>
           <template x-if="p.schedules && Object.keys(p.schedules).length > 0">
             <div class="mb-3 space-y-0.5">
-              <div class="text-xs font-medium text-gray-500 mb-1">⏰ Heizzeiten</div>
+              <div class="text-xs font-medium text-gray-500 mb-1" x-text="t('profiles_schedules_label')"></div>
               <template x-for="[day, periods] in Object.entries(p.schedules)" :key="day">
                 <div class="text-xs text-gray-500 flex gap-1 flex-wrap">
                   <span class="font-medium text-gray-700 w-16" x-text="profileDayLabel(day)"></span>
@@ -385,22 +385,22 @@
               </template>
             </div>
           </template>
-          <button @click="openApplyProfile(p.name)" class="w-full bg-blue-600 text-white rounded px-3 py-1.5 text-sm hover:bg-blue-700">Anwenden…</button>
+          <button @click="openApplyProfile(p.name)" class="w-full bg-blue-600 text-white rounded px-3 py-1.5 text-sm hover:bg-blue-700" x-text="t('profiles_apply_btn')"></button>
         </div>
       </template>
-      <div x-show="profiles.length === 0" class="col-span-3 text-gray-400 italic">No profiles yet. Create one with "+ New Profile".</div>
+      <div x-show="profiles.length === 0" class="col-span-3 text-gray-400 italic" x-text="t('profiles_no_profiles')"></div>
     </div>
   </div>
 
   <!-- ══════════════════ SZENEN ══════════════════ -->
   <div x-show="page === 'szenen'">
     <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">Szenen</h1>
-      <button @click="openNewPreset()" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">+ Neue Szene</button>
+      <h1 class="text-2xl font-bold" x-text="t('szenen_title')"></h1>
+      <button @click="openNewPreset()" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" x-text="t('szenen_new_btn')"></button>
     </div>
-    <p class="text-sm text-gray-500 mb-5">Jede Szene weist bestimmten Geräten ein Profil zu. Mit einem Klick werden alle Zuweisungen gleichzeitig angewendet.</p>
+    <p class="text-sm text-gray-500 mb-5" x-text="t('szenen_description')"></p>
 
-    <div x-show="presets.length === 0" class="text-gray-400 italic">Noch keine Szenen. Erstelle eine mit "+ Neue Szene".</div>
+    <div x-show="presets.length === 0" class="text-gray-400 italic" x-text="t('szenen_no_scenes')"></div>
 
     <div class="space-y-4">
       <template x-for="preset in presets" :key="preset.id">
@@ -409,11 +409,11 @@
             <div class="font-semibold text-lg" x-text="preset.name"></div>
             <div class="flex gap-2">
               <button @click="openEditPreset(preset)"
-                class="text-gray-400 hover:text-blue-500 p-1" title="Bearbeiten">
+                class="text-gray-400 hover:text-blue-500 p-1" :title="t('szenen_edit_title')">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
               </button>
               <button @click="deletePreset(preset.id)"
-                class="text-gray-400 hover:text-red-500 p-1" title="Löschen">
+                class="text-gray-400 hover:text-red-500 p-1" :title="t('szenen_delete_title')">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               </button>
             </div>
@@ -453,7 +453,7 @@
             </div>
             <div x-show="(presetProgress[preset.id]?.total || 0) > 0" class="mt-2">
               <div class="flex justify-between text-xs text-gray-400 mb-1">
-                <span x-text="(presetProgress[preset.id]?.done || 0) + ' / ' + (presetProgress[preset.id]?.total || 0) + ' Geräte'"></span>
+                <span x-text="(presetProgress[preset.id]?.done || 0) + ' / ' + (presetProgress[preset.id]?.total || 0) + ' ' + t('szenen_devices_count')"></span>
                 <span x-text="Math.round(((presetProgress[preset.id]?.done || 0) / (presetProgress[preset.id]?.total || 1)) * 100) + '%'"></span>
               </div>
               <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
@@ -466,7 +466,7 @@
             :disabled="presetApplying === preset.id"
             class="w-full bg-blue-600 text-white rounded px-3 py-1.5 text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
             <svg x-show="presetApplying === preset.id" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-            <span x-text="presetApplying === preset.id ? 'Wird angewendet…' : 'Szene anwenden'"></span>
+            <span x-text="presetApplying === preset.id ? t('szenen_applying') : t('szenen_apply_btn')"></span>
           </button>
         </div>
       </template>
@@ -476,10 +476,10 @@
   <!-- ══════════════════ DISCOVERY ══════════════════ -->
   <div x-show="page === 'discovery'">
     <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">Discover Devices</h1>
+      <h1 class="text-2xl font-bold" x-text="t('discovery_title')"></h1>
       <div class="flex items-center gap-3">
         <label class="text-sm text-gray-500 flex items-center gap-1.5" x-show="!discovering">
-          Duration:
+          <span x-text="t('discovery_duration')"></span>
           <select x-model.number="scanTimeout" class="border rounded px-2 py-1 text-sm">
             <option value="10">10 s</option>
             <option value="20">20 s</option>
@@ -493,7 +493,7 @@
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
           </svg>
-          <span x-text="discovering ? 'Scanning…' : 'Scan'"></span>
+          <span x-text="discovering ? t('discovery_scanning') : t('discovery_scan_btn')"></span>
         </button>
       </div>
     </div>
@@ -501,9 +501,9 @@
     <!-- Progress bar -->
     <div x-show="discovering || scanDone" class="mb-5">
       <div class="flex justify-between text-xs text-gray-500 mb-1">
-        <span x-show="discovering" x-text="`Scanning… ${Math.round(scanElapsed)}s / ${scanTimeout}s`"></span>
-        <span x-show="!discovering && scanDone" class="text-green-600 font-medium">Scan complete</span>
-        <span x-text="discovered.length + ' device(s) found'"></span>
+        <span x-show="discovering" x-text="t('discovery_scanning') + ' ' + Math.round(scanElapsed) + 's / ' + scanTimeout + 's'"></span>
+        <span x-show="!discovering && scanDone" class="text-green-600 font-medium" x-text="t('discovery_scan_complete')"></span>
+        <span x-text="discovered.length + ' ' + t('discovery_found')"></span>
       </div>
       <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
         <div class="progress-bar h-2 rounded-full"
@@ -514,19 +514,19 @@
 
     <!-- Known from DB (shown before scanning) -->
     <div x-show="!discovering && !scanDone && knownDevices.length > 0" class="mb-6">
-      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Previously Discovered</h2>
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3" x-text="t('discovery_previously')"></h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <template x-for="d in knownDevices" :key="d.address">
           <div class="bg-white rounded-xl shadow-sm p-3 border border-gray-100 flex justify-between items-center">
             <div>
               <div class="font-medium" x-text="d.name"></div>
               <div class="text-xs font-mono text-gray-400" x-text="d.address"></div>
-              <div class="text-xs text-gray-400 mt-0.5">Last seen: <span x-text="fmtDate(d.last_seen)"></span></div>
+              <div class="text-xs text-gray-400 mt-0.5"><span x-text="t('discovery_last_seen')"></span> <span x-text="fmtDate(d.last_seen)"></span></div>
             </div>
             <button @click="addDiscoveredDirect(d)" :disabled="d.configured"
               class="text-sm px-3 py-1.5 rounded flex-shrink-0 ml-3"
               :class="d.configured ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'">
-              <span x-text="d.configured ? '✓ Added' : 'Add'"></span>
+              <span x-text="d.configured ? t('discovery_added') : t('discovery_add')"></span>
             </button>
           </div>
         </template>
@@ -535,16 +535,14 @@
 
     <!-- Empty state -->
     <div x-show="!discovering && !scanDone && knownDevices.length === 0" class="text-gray-400 italic">
-      Press <strong>Scan</strong> to search for CometBlue devices via Bluetooth.
+      <span x-text="t('discovery_press_scan')"></span> <strong x-text="t('discovery_scan_btn')"></strong> <span x-text="t('discovery_press_scan2')"></span>
     </div>
-    <div x-show="scanDone && discovered.length === 0" class="text-gray-400 italic mt-2">
-      No CometBlue devices found. Make sure the thermostat is nearby and awake.
-    </div>
+    <div x-show="scanDone && discovered.length === 0" class="text-gray-400 italic mt-2" x-text="t('discovery_no_found')"></div>
 
     <!-- Live scan results -->
     <div x-show="discovered.length > 0">
       <h2 x-show="scanDone || discovering" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3"
-        x-text="discovering ? 'Found so far…' : 'Scan Results'"></h2>
+        x-text="discovering ? t('discovery_found_so_far') : t('discovery_results')"></h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <template x-for="d in discovered" :key="d.address">
           <div class="bg-white rounded-xl shadow p-4 border border-gray-100 flex justify-between items-center"
@@ -563,12 +561,12 @@
               <button @click="addDiscoveredDirect(d)" :disabled="isConfigured(d.address)"
                 class="text-sm px-3 py-1.5 rounded"
                 :class="isConfigured(d.address) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'">
-                <span x-text="isConfigured(d.address) ? '✓ Vorhanden' : 'Hinzufügen'"></span>
+                <span x-text="isConfigured(d.address) ? t('discovery_already_added') : t('discovery_add_device')"></span>
               </button>
               <button @click="openAssignModal(d)"
-                title="Nur nötig wenn MAC-Auflösung nicht funktioniert. Normalfall: Gerät hinzufügen → Poll → UUID wird automatisch aktuell gehalten."
-                class="text-xs px-3 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200">
-                🔗 Zuordnen…
+                :title="t('discovery_assign_title')"
+                class="text-xs px-3 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200"
+                x-text="t('discovery_assign_btn')">
               </button>
             </div>
           </div>
@@ -584,25 +582,25 @@
 <!-- Set Temperature -->
 <div x-show="showSetTemp" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showSetTemp=false">
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
-    <h2 class="text-lg font-bold mb-1">🌡 Temperaturen setzen</h2>
+    <h2 class="text-lg font-bold mb-1" x-text="t('modal_set_temp_title')"></h2>
     <p class="text-sm text-gray-500 mb-4" x-text="selectedDevice?.name || selectedDevice?.address"></p>
     <div x-show="tempLoading" class="flex items-center justify-center py-8 gap-3 text-gray-400">
       <svg class="spinner w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-      Lade aktuelle Einstellungen…
+      <span x-text="t('modal_set_temp_loading')"></span>
     </div>
     <div x-show="!tempLoading" class="space-y-3">
       <label class="block">
-        <span class="text-sm font-medium text-orange-700">Heizen (°C)</span>
-        <span class="text-xs text-gray-400 ml-1">— Temperatur während der Heizzeiten</span>
-        <input type="number" step="0.5" min="5" max="35" x-model="tempForm.comfort" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="z.B. 22.0"></label>
+        <span class="text-sm font-medium text-orange-700" x-text="t('modal_comfort_label')"></span>
+        <span class="text-xs text-gray-400 ml-1" x-text="t('modal_comfort_hint')"></span>
+        <input type="number" step="0.5" min="5" max="35" x-model="tempForm.comfort" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" :placeholder="t('modal_comfort_placeholder')"></label>
       <label class="block">
-        <span class="text-sm font-medium text-blue-600">Absenken (°C)</span>
-        <span class="text-xs text-gray-400 ml-1">— Temperatur außerhalb der Heizzeiten</span>
-        <input type="number" step="0.5" min="5" max="35" x-model="tempForm.eco" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="z.B. 17.0"></label>
-      <label class="block"><span class="text-sm text-gray-600">Offset (°C, z.B. -1.5 … +1.5)</span>
+        <span class="text-sm font-medium text-blue-600" x-text="t('modal_eco_label')"></span>
+        <span class="text-xs text-gray-400 ml-1" x-text="t('modal_eco_hint')"></span>
+        <input type="number" step="0.5" min="5" max="35" x-model="tempForm.eco" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" :placeholder="t('modal_eco_placeholder')"></label>
+      <label class="block"><span class="text-sm text-gray-600" x-text="t('modal_offset_label')"></span>
         <input type="number" step="0.5" min="-3.5" max="3.5" x-model="tempForm.offset" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="0.0"></label>
       <div class="flex items-center justify-between py-2 border-t">
-        <span class="text-sm text-gray-600">🔒 Kindersicherung</span>
+        <span class="text-sm text-gray-600" x-text="t('modal_child_lock_label')"></span>
         <button @click="tempForm.child_lock = !tempForm.child_lock"
           class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
           :class="tempForm.child_lock ? 'bg-orange-500' : 'bg-gray-200'">
@@ -615,9 +613,9 @@
       <button @click="submitSetTemp()" :disabled="tempSaving"
         class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
         <svg x-show="tempSaving" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-        <span x-text="tempSaving ? 'Speichere…' : 'Speichern'"></span>
+        <span x-text="tempSaving ? t('btn_saving') : t('btn_save')"></span>
       </button>
-      <button @click="showSetTemp=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+      <button @click="showSetTemp=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200" x-text="t('btn_cancel')"></button>
     </div>
     <div x-show="tempMsg" class="mt-2 text-sm" :class="tempMsg?.startsWith('Error') ? 'text-red-500' : 'text-green-600'" x-text="tempMsg"></div>
   </div>
@@ -628,16 +626,16 @@
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
     <div class="flex justify-between items-start mb-1">
       <div>
-        <h2 class="text-lg font-bold">⏰ Heizzeiten</h2>
+        <h2 class="text-lg font-bold" x-text="t('modal_schedule_title')"></h2>
         <p class="text-sm text-gray-500" x-text="selectedDevice?.name || selectedDevice?.address"></p>
       </div>
       <button @click="showSchedule=false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
     </div>
-    <p class="text-xs text-gray-400 mb-3">Zeiten in 10-Minuten-Schritten. Leere Felder = Periode deaktiviert.</p>
+    <p class="text-xs text-gray-400 mb-3" x-text="t('modal_schedule_hint')"></p>
 
     <div x-show="scheduleLoading" class="flex items-center justify-center py-12 gap-3 text-gray-400 flex-1">
       <svg class="spinner w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-      Lade Heizzeiten vom Gerät…
+      <span x-text="t('modal_schedule_loading')"></span>
     </div>
 
     <div x-show="!scheduleLoading && scheduleForm" class="overflow-y-auto flex-1">
@@ -655,7 +653,7 @@
                 <input type="time" step="600" x-model="p.end"
                   class="border rounded px-2 py-1 text-sm w-28"
                   :class="p.end && !validTime(p.end) ? 'border-red-400' : ''">
-                <button @click="p.start = ''; p.end = ''" class="text-gray-300 hover:text-red-500 text-sm" title="Löschen">✕</button>
+                <button @click="p.start = ''; p.end = ''" class="text-gray-300 hover:text-red-500 text-sm" :title="t('modal_schedule_delete_title')">✕</button>
               </div>
             </template>
           </div>
@@ -667,9 +665,9 @@
       <button @click="submitSchedule()" :disabled="scheduleSaving"
         class="flex-1 bg-green-600 text-white rounded px-4 py-2 text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
         <svg x-show="scheduleSaving" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-        <span x-text="scheduleSaving ? 'Speichere…' : 'Speichern'"></span>
+        <span x-text="scheduleSaving ? t('btn_saving') : t('btn_save')"></span>
       </button>
-      <button @click="showSchedule=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+      <button @click="showSchedule=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200" x-text="t('btn_cancel')"></button>
     </div>
     <div x-show="scheduleMsg" class="mt-2 text-sm text-center"
       :class="scheduleMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'" x-text="scheduleMsg"></div>
@@ -682,27 +680,27 @@
     <div class="flex items-start gap-3 mb-4">
       <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-lg">🔒</div>
       <div>
-        <h2 class="text-lg font-bold">PIN setzen</h2>
-        <p class="text-sm text-gray-500 mt-0.5">PIN für <strong x-text="selectedDevice?.name || selectedDevice?.address"></strong> eingeben, prüfen und speichern.</p>
+        <h2 class="text-lg font-bold" x-text="t('modal_pin_title')"></h2>
+        <p class="text-sm text-gray-500 mt-0.5"><span x-text="t('modal_pin_desc')"></span> <strong x-text="selectedDevice?.name || selectedDevice?.address"></strong> <span x-text="t('modal_pin_desc2')"></span></p>
       </div>
     </div>
-    <label class="block"><span class="text-sm text-gray-600">PIN</span>
+    <label class="block"><span class="text-sm text-gray-600" x-text="t('modal_pin_label')"></span>
       <input type="number" x-model="pinPromptForm.pin" @keyup.enter="submitPinPrompt()"
         class="mt-1 block w-full border-2 rounded px-3 py-2 text-sm font-mono"
-        :class="pinPromptMsg ? 'border-red-400' : 'border-gray-200'" placeholder="PIN eingeben (Standard: 0)"></label>
+        :class="pinPromptMsg ? 'border-red-400' : 'border-gray-200'" :placeholder="t('modal_pin_placeholder')"></label>
     <div x-show="pinPromptMsg" class="mt-2 text-sm text-red-500">⚠ <span x-text="pinPromptMsg"></span></div>
     <div class="flex gap-2 mt-4">
       <button @click="submitPinPrompt()" :disabled="pinPromptTesting"
         class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
         <svg x-show="pinPromptTesting" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-        <span x-text="pinPromptTesting ? 'Prüfe…' : 'Prüfen & Speichern'"></span>
+        <span x-text="pinPromptTesting ? t('modal_pin_testing') : t('modal_pin_save')"></span>
       </button>
-      <button @click="showPinPrompt=false" class="bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+      <button @click="showPinPrompt=false" class="bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200" x-text="t('btn_cancel')"></button>
     </div>
     <button @click="savePinWithoutTest()" :disabled="pinPromptTesting"
       class="w-full mt-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded px-3 py-1.5 transition-colors"
-      title="PIN direkt speichern ohne BLE-Verbindung — z.B. wenn Gerät gerade offline ist">
-      Offline speichern (ohne Test)
+      :title="t('modal_pin_offline_title')"
+      x-text="t('modal_pin_offline')">
     </button>
   </div>
 </div>
@@ -710,36 +708,36 @@
 <!-- Rename / Device Settings -->
 <div x-show="showRename" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showRename=false">
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
-    <h2 class="text-lg font-bold mb-1">Gerät bearbeiten</h2>
+    <h2 class="text-lg font-bold mb-1" x-text="t('modal_rename_title')"></h2>
     <p class="text-xs text-gray-400 font-mono mb-4" x-text="renameDevice?.address"></p>
     <div class="space-y-3">
-      <label class="block"><span class="text-sm text-gray-600">Name</span>
+      <label class="block"><span class="text-sm text-gray-600" x-text="t('modal_rename_name_label')"></span>
         <input type="text" x-model="renameForm.name"
           class="mt-1 block w-full border-2 border-blue-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-          placeholder="z.B. Wohnzimmer Links"></label>
-      <label class="block"><span class="text-sm text-gray-600">PIN</span>
+          :placeholder="t('modal_rename_name_placeholder')"></label>
+      <label class="block"><span class="text-sm text-gray-600" x-text="t('modal_rename_pin_label')"></span>
         <input type="number" x-model="renameForm.pin"
           class="mt-1 block w-full border-2 border-blue-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500"
-          placeholder="PIN (leer = unverändert)"></label>
+          :placeholder="t('modal_rename_pin_placeholder')"></label>
       <div class="block">
-        <span class="text-sm text-gray-600">Bluetooth MAC-Adresse</span>
+        <span class="text-sm text-gray-600" x-text="t('modal_rename_mac_label')"></span>
         <div x-show="renameDevice?.mac_address"
           class="mt-1 px-3 py-1.5 bg-gray-50 border rounded text-sm font-mono text-blue-700"
           x-text="renameDevice?.mac_address"></div>
         <div x-show="!renameDevice?.mac_address"
-          class="mt-1 text-xs text-gray-400 italic">Wird automatisch beim nächsten Poll ermittelt.</div>
+          class="mt-1 text-xs text-gray-400 italic" x-text="t('modal_rename_mac_auto')"></div>
       </div>
     </div>
     <div x-show="renameMsg" class="mt-2 text-sm" :class="renameMsg?.startsWith('Error') ? 'text-red-500' : 'text-green-600'" x-text="renameMsg"></div>
     <div class="flex gap-2 mt-4">
-      <button @click="submitRename()" class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">Speichern</button>
-      <button @click="showRename=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+      <button @click="submitRename()" class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700" x-text="t('btn_save')"></button>
+      <button @click="showRename=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200" x-text="t('btn_cancel')"></button>
     </div>
     <div class="mt-3 pt-3 border-t">
       <button @click="resetDeviceData(renameDevice.address)"
         class="w-full text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded px-3 py-1.5 transition-colors"
-        title="Löscht Verlauf und gecachten Status. Gerätekonfiguration (Name, PIN, MAC) bleibt erhalten.">
-        🗑 Daten zurücksetzen (Verlauf + Status löschen)
+        :title="t('modal_rename_reset_title')"
+        x-text="t('modal_rename_reset_btn')">
       </button>
     </div>
   </div>
@@ -748,18 +746,18 @@
 <!-- Add Device -->
 <div x-show="showAddDevice" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showAddDevice=false">
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
-    <h2 class="text-lg font-bold mb-4">Add Device</h2>
+    <h2 class="text-lg font-bold mb-4" x-text="t('modal_add_title')"></h2>
     <div class="space-y-3">
-      <label class="block"><span class="text-sm text-gray-600">MAC Address *</span>
+      <label class="block"><span class="text-sm text-gray-600" x-text="t('modal_add_mac_label')"></span>
         <input type="text" x-model="addForm.address" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm font-mono" placeholder="E0:E5:CF:C1:D4:3F"></label>
-      <label class="block"><span class="text-sm text-gray-600">Name</span>
-        <input type="text" x-model="addForm.name" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="Living Room"></label>
-      <label class="block"><span class="text-sm text-gray-600">PIN (optional)</span>
-        <input type="number" x-model="addForm.pin" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="Leave empty if no PIN"></label>
+      <label class="block"><span class="text-sm text-gray-600" x-text="t('modal_add_name_label')"></span>
+        <input type="text" x-model="addForm.name" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" :placeholder="t('modal_add_name_placeholder')"></label>
+      <label class="block"><span class="text-sm text-gray-600" x-text="t('modal_add_pin_label')"></span>
+        <input type="number" x-model="addForm.pin" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" :placeholder="t('modal_add_pin_placeholder')"></label>
     </div>
     <div class="flex gap-2 mt-4">
-      <button @click="submitAddDevice()" class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">Add</button>
-      <button @click="showAddDevice=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Cancel</button>
+      <button @click="submitAddDevice()" class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700" x-text="t('modal_add_btn')"></button>
+      <button @click="showAddDevice=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200" x-text="t('btn_cancel')"></button>
     </div>
     <div x-show="addMsg" class="mt-2 text-sm" :class="addMsg?.startsWith('Error') ? 'text-red-500' : 'text-green-600'" x-text="addMsg"></div>
   </div>
@@ -769,36 +767,36 @@
 <div x-show="showProfileModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showProfileModal=false">
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
     <div class="flex justify-between items-start mb-4">
-      <h2 class="text-lg font-bold" x-text="profileEditMode ? 'Profil bearbeiten' : 'Neues Profil'"></h2>
+      <h2 class="text-lg font-bold" x-text="profileEditMode ? t('modal_profile_edit_title') : t('modal_profile_new_title')"></h2>
       <button @click="showProfileModal=false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
     </div>
     <div class="overflow-y-auto flex-1 space-y-4">
       <!-- Name + Temperaturen -->
       <div class="space-y-3">
         <label class="block">
-          <span class="text-sm text-gray-600">Name *</span>
+          <span class="text-sm text-gray-600" x-text="t('modal_profile_name_label')"></span>
           <input type="text" x-model="profileForm.name" :readonly="profileEditMode"
             :class="profileEditMode ? 'bg-gray-50 text-gray-500' : ''"
             class="mt-1 block w-full border rounded px-3 py-1.5 text-sm"
-            placeholder="z.B. winter">
+            :placeholder="t('modal_profile_name_placeholder')">
         </label>
         <div class="flex gap-3">
           <label class="block flex-1">
-            <span class="text-sm text-gray-600">Heizen (°C)</span>
+            <span class="text-sm text-gray-600" x-text="t('modal_profile_comfort_label')"></span>
             <input type="number" step="0.5" min="5" max="35" x-model="profileForm.comfort_temp"
-              class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="z.B. 22.0">
+              class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" :placeholder="t('modal_profile_comfort_placeholder')">
           </label>
           <label class="block flex-1">
-            <span class="text-sm text-gray-600">Absenken (°C)</span>
+            <span class="text-sm text-gray-600" x-text="t('modal_profile_eco_label')"></span>
             <input type="number" step="0.5" min="5" max="35" x-model="profileForm.eco_temp"
-              class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="z.B. 17.0">
+              class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" :placeholder="t('modal_profile_eco_placeholder')">
           </label>
         </div>
-        <!-- Kindersicherung -->
+        <!-- Child Lock -->
         <div class="flex items-center justify-between py-2 border-t">
           <div>
-            <span class="text-sm text-gray-700">🔒 Kindersicherung beim Anwenden</span>
-            <div class="text-xs text-gray-400">Nicht ändern = leer lassen</div>
+            <span class="text-sm text-gray-700" x-text="t('modal_profile_childlock_label')"></span>
+            <div class="text-xs text-gray-400" x-text="t('modal_profile_childlock_hint')"></div>
           </div>
           <div class="flex items-center gap-2">
             <button @click="profileForm.child_lock = null"
@@ -814,25 +812,25 @@
         </div>
       </div>
 
-      <!-- Heizzeiten -->
+      <!-- Schedule -->
       <div>
-        <div class="text-sm font-medium text-gray-700 mb-1">⏰ Heizzeiten</div>
-        <p class="text-xs text-gray-400 mb-2">Zeiten in 10-Minuten-Schritten. Leere Felder = Periode deaktiviert.</p>
+        <div class="text-sm font-medium text-gray-700 mb-1" x-text="t('modal_profile_schedules_label')"></div>
+        <p class="text-xs text-gray-400 mb-2" x-text="t('modal_profile_schedules_hint')"></p>
 
-        <!-- Tab-Auswahl -->
+        <!-- Tab selection -->
         <div class="flex gap-1 mb-3">
           <button @click="profileSchedTab='week'"
             :class="profileSchedTab==='week' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
-            class="px-3 py-1.5 rounded text-xs font-medium">Wochentage (Mo–Fr)</button>
+            class="px-3 py-1.5 rounded text-xs font-medium" x-text="t('modal_profile_tab_week')"></button>
           <button @click="profileSchedTab='weekend'"
             :class="profileSchedTab==='weekend' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
-            class="px-3 py-1.5 rounded text-xs font-medium">Wochenende (Sa–So)</button>
+            class="px-3 py-1.5 rounded text-xs font-medium" x-text="t('modal_profile_tab_weekend')"></button>
           <button @click="profileSchedTab='individual'"
             :class="profileSchedTab==='individual' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
-            class="px-3 py-1.5 rounded text-xs font-medium">Individuell</button>
+            class="px-3 py-1.5 rounded text-xs font-medium" x-text="t('modal_profile_tab_individual')"></button>
         </div>
 
-        <!-- Wochentage -->
+        <!-- Weekdays -->
         <div x-show="profileSchedTab==='week'">
           <div class="space-y-1.5">
             <template x-for="(p, pi) in profileWeekPeriods" :key="pi">
@@ -845,17 +843,17 @@
                 <input type="time" step="600" x-model="p.end"
                   class="border rounded px-2 py-1 text-sm w-28"
                   :class="p.end && !validTime(p.end) ? 'border-red-400' : ''">
-                <button @click="p.start=''; p.end=''" class="text-gray-300 hover:text-red-500 text-sm" title="Löschen">✕</button>
+                <button @click="p.start=''; p.end=''" class="text-gray-300 hover:text-red-500 text-sm" :title="t('modal_profile_schedule_delete_title')">✕</button>
               </div>
             </template>
           </div>
           <button @click="applyWeekToSchedule()"
-            class="mt-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded px-3 py-1 hover:bg-green-100">
-            → Mo–Fr übernehmen
+            class="mt-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded px-3 py-1 hover:bg-green-100"
+            x-text="t('modal_profile_apply_week')">
           </button>
         </div>
 
-        <!-- Wochenende -->
+        <!-- Weekend -->
         <div x-show="profileSchedTab==='weekend'">
           <div class="space-y-1.5">
             <template x-for="(p, pi) in profileWeekendPeriods" :key="pi">
@@ -868,17 +866,17 @@
                 <input type="time" step="600" x-model="p.end"
                   class="border rounded px-2 py-1 text-sm w-28"
                   :class="p.end && !validTime(p.end) ? 'border-red-400' : ''">
-                <button @click="p.start=''; p.end=''" class="text-gray-300 hover:text-red-500 text-sm" title="Löschen">✕</button>
+                <button @click="p.start=''; p.end=''" class="text-gray-300 hover:text-red-500 text-sm" :title="t('modal_profile_schedule_delete_title')">✕</button>
               </div>
             </template>
           </div>
           <button @click="applyWeekendToSchedule()"
-            class="mt-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded px-3 py-1 hover:bg-green-100">
-            → Sa–So übernehmen
+            class="mt-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded px-3 py-1 hover:bg-green-100"
+            x-text="t('modal_profile_apply_weekend')">
           </button>
         </div>
 
-        <!-- Individuell -->
+        <!-- Individual -->
         <div x-show="profileSchedTab==='individual'">
           <template x-for="row in profileScheduleForm" :key="row.day">
             <div class="border-b last:border-0 py-2">
@@ -894,7 +892,7 @@
                     <input type="time" step="600" x-model="p.end"
                       class="border rounded px-2 py-1 text-sm w-28"
                       :class="p.end && !validTime(p.end) ? 'border-red-400' : ''">
-                    <button @click="p.start=''; p.end=''" class="text-gray-300 hover:text-red-500 text-sm" title="Löschen">✕</button>
+                    <button @click="p.start=''; p.end=''" class="text-gray-300 hover:text-red-500 text-sm" :title="t('modal_profile_schedule_delete_title')">✕</button>
                   </div>
                 </template>
               </div>
@@ -905,12 +903,12 @@
     </div>
 
     <div x-show="profileMsg" class="mt-3 text-sm"
-      :class="profileMsg.startsWith('Fehler') ? 'text-red-500' : 'text-green-600'" x-text="profileMsg"></div>
+      :class="profileMsg.startsWith('Error') || profileMsg.startsWith('Fehler') ? 'text-red-500' : 'text-green-600'" x-text="profileMsg"></div>
     <div class="flex gap-2 mt-4 pt-3 border-t">
-      <button @click="submitProfileModal()" class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">Speichern</button>
+      <button @click="submitProfileModal()" class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700" x-text="t('btn_save')"></button>
       <button x-show="profileEditMode" @click="deleteProfile(profileForm.name)"
-        class="bg-red-100 text-red-600 rounded px-4 py-2 text-sm hover:bg-red-200">Löschen</button>
-      <button @click="showProfileModal=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+        class="bg-red-100 text-red-600 rounded px-4 py-2 text-sm hover:bg-red-200" x-text="t('modal_profile_delete_btn')"></button>
+      <button @click="showProfileModal=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200" x-text="t('btn_cancel')"></button>
     </div>
   </div>
 </div>
@@ -918,25 +916,25 @@
 <!-- Assign discovered device to existing record -->
 <div x-show="showAssignModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showAssignModal=false">
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
-    <h2 class="text-lg font-bold mb-1">🔗 Gerät manuell zuordnen</h2>
-    <p class="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1 mb-3">⚠ Nur als Fallback nötig. Normalerweise erkennt das System nach einem Batteriewechsel die neue UUID automatisch anhand der gespeicherten MAC-Adresse.</p>
-    <p class="text-sm text-gray-500 mb-1">Gefundene neue UUID:</p>
+    <h2 class="text-lg font-bold mb-1" x-text="t('modal_assign_title')"></h2>
+    <p class="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1 mb-3" x-text="t('modal_assign_warning')"></p>
+    <p class="text-sm text-gray-500 mb-1" x-text="t('modal_assign_new_uuid')"></p>
     <p class="text-xs font-mono text-gray-700 bg-gray-50 rounded px-2 py-1 mb-4" x-text="assignDevice?.address"></p>
-    <p class="text-sm text-gray-600 mb-2">Welchem gespeicherten Gerät soll diese UUID zugeordnet werden?</p>
+    <p class="text-sm text-gray-600 mb-2" x-text="t('modal_assign_select_device')"></p>
     <select x-model="assignTargetAddress" class="w-full border rounded px-3 py-2 text-sm mb-4">
-      <option value="">— Gerät auswählen —</option>
+      <option value="" x-text="t('modal_assign_select_placeholder')"></option>
       <template x-for="dev in devices" :key="dev.address">
         <option :value="dev.address" x-text="(dev.name || dev.address) + ' (' + dev.address.substring(0,8) + '…)'"></option>
       </template>
     </select>
-    <p class="text-xs text-gray-400 mb-4">Die UUID des gewählten Geräts wird durch die neue ersetzt. Alle Daten (Status, Verlauf) bleiben erhalten.</p>
+    <p class="text-xs text-gray-400 mb-4" x-text="t('modal_assign_note')"></p>
     <div x-show="assignMsg" class="text-sm mb-3" :class="assignMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'" x-text="assignMsg"></div>
     <div class="flex gap-2">
       <button @click="submitAssign()" :disabled="!assignTargetAddress"
-        class="flex-1 bg-orange-600 text-white rounded px-4 py-2 text-sm hover:bg-orange-700 disabled:opacity-50">
-        Zuordnen & UUID ersetzen
+        class="flex-1 bg-orange-600 text-white rounded px-4 py-2 text-sm hover:bg-orange-700 disabled:opacity-50"
+        x-text="t('modal_assign_btn')">
       </button>
-      <button @click="showAssignModal=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+      <button @click="showAssignModal=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200" x-text="t('btn_cancel')"></button>
     </div>
   </div>
 </div>
@@ -944,21 +942,21 @@
 <!-- Preset Edit Modal -->
 <div x-show="showPresetModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showPresetModal=false">
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4 max-h-[90vh] flex flex-col">
-    <h2 class="text-lg font-bold mb-4" x-text="presetEditId ? 'Szene bearbeiten' : 'Neue Szene'"></h2>
+    <h2 class="text-lg font-bold mb-4" x-text="presetEditId ? t('modal_preset_edit_title') : t('modal_preset_new_title')"></h2>
     <label class="block mb-4">
-      <span class="text-sm text-gray-600">Name</span>
+      <span class="text-sm text-gray-600" x-text="t('modal_preset_name_label')"></span>
       <input type="text" x-model="presetForm.name"
         class="mt-1 block w-full border-2 border-blue-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-        placeholder="z.B. Alltag, Urlaub, Nacht…">
+        :placeholder="t('modal_preset_name_placeholder')">
     </label>
-    <div class="text-sm font-medium text-gray-600 mb-2">Gerät → Profil</div>
+    <div class="text-sm font-medium text-gray-600 mb-2" x-text="t('modal_preset_device_profile')"></div>
     <div class="overflow-y-auto flex-1 space-y-2 mb-4">
       <template x-for="dev in devices" :key="dev.address">
         <div class="flex items-center gap-3">
           <span class="text-sm flex-1 truncate" x-text="dev.name || dev.address.substring(0,8)"></span>
           <select x-model="presetForm.assignments[dev.address]"
             class="border rounded px-2 py-1 text-sm w-36 focus:outline-none focus:border-blue-400">
-            <option value="">— nicht ändern —</option>
+            <option value="" x-text="t('modal_preset_no_change')"></option>
             <template x-for="p in profiles" :key="p.name">
               <option :value="p.name" x-text="p.name"></option>
             </template>
@@ -967,15 +965,15 @@
       </template>
     </div>
     <div class="flex gap-2 mb-2">
-      <button @click="presetSetAll()" class="text-xs text-blue-600 hover:underline">Alle gleich setzen…</button>
+      <button @click="presetSetAll()" class="text-xs text-blue-600 hover:underline" x-text="t('modal_preset_set_all')"></button>
     </div>
     <div x-show="presetMsg" class="text-sm mb-3"
       :class="presetMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'" x-text="presetMsg"></div>
     <div class="flex gap-2 pt-3 border-t">
       <button @click="submitPreset()"
-        class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">Speichern</button>
+        class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700" x-text="t('btn_save')"></button>
       <button @click="showPresetModal=false"
-        class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+        class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200" x-text="t('btn_cancel')"></button>
     </div>
   </div>
 </div>
@@ -983,18 +981,18 @@
 <!-- Preset Set-All Helper Modal -->
 <div x-show="showPresetSetAll" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" @click.self="showPresetSetAll=false">
   <div class="bg-white rounded-xl shadow-xl p-5 w-full max-w-xs mx-4">
-    <h3 class="font-semibold mb-3">Alle Geräte auf Profil setzen</h3>
+    <h3 class="font-semibold mb-3" x-text="t('modal_preset_setall_title')"></h3>
     <select x-model="presetSetAllProfile" class="w-full border rounded px-2 py-1.5 text-sm mb-4">
-      <option value="">Profil auswählen…</option>
+      <option value="" x-text="t('modal_preset_setall_select')"></option>
       <template x-for="p in profiles" :key="p.name">
         <option :value="p.name" x-text="p.name"></option>
       </template>
     </select>
     <div class="flex gap-2">
       <button @click="confirmPresetSetAll()"
-        class="flex-1 bg-blue-600 text-white rounded px-3 py-1.5 text-sm hover:bg-blue-700">Übernehmen</button>
+        class="flex-1 bg-blue-600 text-white rounded px-3 py-1.5 text-sm hover:bg-blue-700" x-text="t('modal_preset_setall_confirm')"></button>
       <button @click="showPresetSetAll=false"
-        class="flex-1 bg-gray-100 rounded px-3 py-1.5 text-sm hover:bg-gray-200">Abbrechen</button>
+        class="flex-1 bg-gray-100 rounded px-3 py-1.5 text-sm hover:bg-gray-200" x-text="t('btn_cancel')"></button>
     </div>
   </div>
 </div>
@@ -1002,8 +1000,8 @@
 <!-- Apply Profile Modal -->
 <div x-show="showApplyProfile" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="!applyProfileApplying && (showApplyProfile=false)">
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
-    <h2 class="text-lg font-bold mb-1">Profil anwenden</h2>
-    <p class="text-sm text-gray-500 mb-4">Profil <strong x-text="applyProfileName"></strong> auf folgende Geräte anwenden:</p>
+    <h2 class="text-lg font-bold mb-1" x-text="t('modal_apply_profile_title')"></h2>
+    <p class="text-sm text-gray-500 mb-4"><span x-text="t('modal_apply_profile_desc')"></span> <strong x-text="applyProfileName"></strong> <span x-text="t('modal_apply_profile_desc2')"></span></p>
 
     <!-- Device list with live status -->
     <div class="space-y-1 mb-3">
@@ -1036,16 +1034,16 @@
           <span class="text-xs ml-auto"
             :class="applyProfileResults[dev.address] && applyProfileResults[dev.address] !== 'ok' && applyProfileResults[dev.address] !== 'applying' ? 'text-red-400' : 'text-gray-400 font-mono'"
             :title="applyProfileResults[dev.address] && applyProfileResults[dev.address] !== 'ok' && applyProfileResults[dev.address] !== 'applying' ? applyProfileResults[dev.address] : ''"
-            x-text="applyProfileResults[dev.address] && applyProfileResults[dev.address] !== 'ok' && applyProfileResults[dev.address] !== 'applying' ? 'Fehler' : dev.address.substring(0,8) + '…'"></span>
+            x-text="applyProfileResults[dev.address] && applyProfileResults[dev.address] !== 'ok' && applyProfileResults[dev.address] !== 'applying' ? t('modal_apply_error_label') : dev.address.substring(0,8) + '…'"></span>
         </div>
       </template>
     </div>
 
     <!-- Select all / none (only before apply) -->
     <div x-show="!applyProfileApplying && !Object.keys(applyProfileResults).length" class="flex gap-2 text-xs mb-3">
-      <button @click="applyProfileTargets = devices.map(d => d.address)" class="text-blue-600 hover:underline">Alle auswählen</button>
+      <button @click="applyProfileTargets = devices.map(d => d.address)" class="text-blue-600 hover:underline" x-text="t('modal_apply_select_all')"></button>
       <span class="text-gray-300">|</span>
-      <button @click="applyProfileTargets = []" class="text-gray-500 hover:underline">Keine</button>
+      <button @click="applyProfileTargets = []" class="text-gray-500 hover:underline" x-text="t('modal_apply_select_none')"></button>
     </div>
 
     <!-- Terminal log + progress bar -->
@@ -1059,7 +1057,7 @@
       </div>
       <div x-show="applyProfileProgress.total > 0" class="mt-2">
         <div class="flex justify-between text-xs text-gray-400 mb-1">
-          <span x-text="applyProfileProgress.done + ' / ' + applyProfileProgress.total + ' Geräte'"></span>
+          <span x-text="applyProfileProgress.done + ' / ' + applyProfileProgress.total + ' ' + t('szenen_devices_count')"></span>
           <span x-text="applyProfileProgress.total ? Math.round((applyProfileProgress.done / applyProfileProgress.total) * 100) + '%' : ''"></span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
@@ -1073,10 +1071,10 @@
       <button @click="submitApplyProfile()" :disabled="applyProfileTargets.length === 0 || applyProfileApplying"
         class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
         <svg x-show="applyProfileApplying" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-        <span x-text="applyProfileApplying ? 'Wird angewendet…' : 'Anwenden (' + applyProfileTargets.length + ')'"></span>
+        <span x-text="applyProfileApplying ? t('modal_apply_applying') : t('modal_apply_btn') + ' (' + applyProfileTargets.length + ')'"></span>
       </button>
       <button @click="showApplyProfile=false" :disabled="applyProfileApplying"
-        class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200 disabled:opacity-50">Abbrechen</button>
+        class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200 disabled:opacity-50" x-text="t('btn_cancel')"></button>
     </div>
   </div>
 </div>
@@ -1095,11 +1093,12 @@ function destroyChart(id) {
   if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
 }
 
-function drawChart(canvasId, records, deviceName) {
+function drawChart(canvasId, records, deviceName, labels) {
   destroyChart(canvasId);
   const canvas = document.getElementById(canvasId);
   if (!canvas || !records.length) return;
 
+  const L = labels || {current: 'Current', comfort: 'Comfort', eco: 'Eco', battery: 'Battery'};
   const color = CHART_COLORS[Object.keys(_charts).length % CHART_COLORS.length];
   const hasBattery = records.some(r => r.battery != null && r.battery !== 255);
   const pts = records.length > 60 ? 0 : 2;
@@ -1109,7 +1108,7 @@ function drawChart(canvasId, records, deviceName) {
     data: {
       datasets: [
         {
-          label: 'Aktuell',
+          label: L.current,
           data: records.map(r => ({x: r.recorded_at, y: r.temp_current})),
           borderColor: color,
           backgroundColor: color + '20',
@@ -1120,7 +1119,7 @@ function drawChart(canvasId, records, deviceName) {
           yAxisID: 'y',
         },
         {
-          label: 'Heizen',
+          label: L.comfort,
           data: records.map(r => ({x: r.recorded_at, y: r.temp_comfort})),
           borderColor: '#f97316',
           borderDash: [4, 3],
@@ -1131,7 +1130,7 @@ function drawChart(canvasId, records, deviceName) {
           yAxisID: 'y',
         },
         {
-          label: 'Absenken',
+          label: L.eco,
           data: records.map(r => ({x: r.recorded_at, y: r.temp_eco})),
           borderColor: '#60a5fa',
           borderDash: [2, 4],
@@ -1142,7 +1141,7 @@ function drawChart(canvasId, records, deviceName) {
           yAxisID: 'y',
         },
         ...(hasBattery ? [{
-          label: 'Batterie',
+          label: L.battery,
           data: records.filter(r => r.battery != null && r.battery !== 255).map(r => ({x: r.recorded_at, y: r.battery})),
           borderColor: '#22c55e',
           borderDash: [3, 3],
@@ -1184,7 +1183,7 @@ function drawChart(canvasId, records, deviceName) {
         y1: {
           position: 'right',
           min: 0, max: 100,
-          title: { display: true, text: 'Batterie %', font: { size: 10 } },
+          title: { display: true, text: (L.battery || 'Battery') + ' %', font: { size: 10 } },
           grid: { drawOnChartArea: false },
           ticks: { font: { size: 10 }, callback: v => v + '%' },
         },
@@ -1193,8 +1192,575 @@ function drawChart(canvasId, records, deviceName) {
   });
 }
 
+const TRANSLATIONS = {
+  de: {
+    // Nav
+    nav_poll_all: 'Poll all',
+    nav_polling: 'Polling…',
+    nav_auto_poll: 'Auto-Poll',
+    nav_title_poll: 'Alle Geräte sofort abfragen',
+    nav_title_autopoll: 'Automatisches Polling ein-/ausschalten',
+    nav_title_debug: 'Debug-Modus',
+    nav_tab_dashboard: 'Dashboard',
+    nav_tab_monitor: 'Monitor',
+    nav_tab_devices: 'Geräte',
+    nav_tab_profiles: 'Profile',
+    nav_tab_szenen: 'Szenen',
+    nav_tab_discovery: 'Entdecken',
+
+    // Dashboard
+    dashboard_title: 'Dashboard',
+    dashboard_no_devices: 'Keine Geräte konfiguriert. Gehe zu',
+    dashboard_discover_link: 'Entdecken',
+    dash_temp_current: 'Aktuell',
+    dash_temp_comfort: 'Heizen',
+    dash_temp_eco: 'Absenken',
+    dash_child_lock: 'Kindersicherung',
+    dash_child_lock_on: '🔒 AN',
+    dash_child_lock_off: '🔓 AUS',
+    dash_child_lock_enable: 'Kindersicherung aktivieren',
+    dash_child_lock_disable: 'Kindersicherung deaktivieren',
+    dash_btn_temps: '🌡 Temperaturen',
+    dash_btn_schedule: '⏰ Heizzeiten',
+    dash_btn_polling: 'Polling…',
+    dash_btn_poll: '↻ Poll',
+    dash_never_polled: 'Noch nicht abgefragt. Poll drücken um Daten zu laden.',
+    dash_rediscover: '🔍 Neu suchen (UUID aktualisieren)',
+
+    // Monitor
+    monitor_title: 'Temperatur-Monitor',
+    monitor_range: 'Zeitraum:',
+    monitor_loading: 'Verlauf wird geladen…',
+    monitor_no_devices: 'Keine Geräte konfiguriert.',
+    monitor_no_data: 'Noch keine Daten — warte auf ersten Poll',
+
+    // Devices page
+    devices_title: 'Geräte',
+    devices_lock_all: '🔒 Alle sperren',
+    devices_unlock_all: '🔓 Alle entsperren',
+    devices_add_btn: '+ Gerät hinzufügen',
+    devices_col_name: 'Name',
+    devices_col_address: 'Adresse',
+    devices_col_temp: 'Aktuell °C',
+    devices_col_battery: 'Batterie',
+    devices_col_seen: 'Zuletzt gesehen',
+    devices_col_actions: 'Aktionen',
+    devices_no_devices: 'Keine Geräte. Gerät hinzufügen oder Entdecken verwenden.',
+    devices_action_temps: 'Temps',
+    devices_action_poll: 'Poll',
+    devices_action_polling: 'Polling…',
+    devices_action_remove: 'Entfernen',
+    devices_lock_all_title: 'Kindersicherung für alle Geräte aktivieren',
+    devices_unlock_all_title: 'Kindersicherung für alle Geräte deaktivieren',
+
+    // Profiles page
+    profiles_title: 'Heizprofile',
+    profiles_new_btn: '+ Neues Profil',
+    profiles_comfort: 'Heizen',
+    profiles_eco: 'Absenken',
+    profiles_schedules_label: '⏰ Heizzeiten',
+    profiles_apply_btn: 'Anwenden…',
+    profiles_no_profiles: 'Noch keine Profile. Erstelle eines mit "+ Neues Profil".',
+
+    // Szenen / Scenes page
+    szenen_title: 'Szenen',
+    szenen_new_btn: '+ Neue Szene',
+    szenen_description: 'Jede Szene weist bestimmten Geräten ein Profil zu. Mit einem Klick werden alle Zuweisungen gleichzeitig angewendet.',
+    szenen_no_scenes: 'Noch keine Szenen. Erstelle eine mit "+ Neue Szene".',
+    szenen_edit_title: 'Bearbeiten',
+    szenen_delete_title: 'Löschen',
+    szenen_devices_count: 'Geräte',
+    szenen_applying: 'Wird angewendet…',
+    szenen_apply_btn: 'Szene anwenden',
+
+    // Discovery page
+    discovery_title: 'Geräte entdecken',
+    discovery_duration: 'Dauer:',
+    discovery_scanning: 'Scan läuft…',
+    discovery_scan_btn: 'Scannen',
+    discovery_scan_complete: 'Scan abgeschlossen',
+    discovery_found: 'Gerät(e) gefunden',
+    discovery_previously: 'Zuvor entdeckt',
+    discovery_last_seen: 'Zuletzt gesehen:',
+    discovery_added: '✓ Hinzugefügt',
+    discovery_add: 'Hinzufügen',
+    discovery_press_scan: 'Drücke',
+    discovery_press_scan2: 'um CometBlue-Geräte per Bluetooth zu suchen.',
+    discovery_no_found: 'Keine CometBlue-Geräte gefunden. Stelle sicher, dass der Thermostat in der Nähe und aktiv ist.',
+    discovery_found_so_far: 'Bisher gefunden…',
+    discovery_results: 'Scan-Ergebnisse',
+    discovery_already_added: '✓ Vorhanden',
+    discovery_add_device: 'Hinzufügen',
+    discovery_assign_btn: '🔗 Zuordnen…',
+    discovery_assign_title: 'Nur nötig wenn MAC-Auflösung nicht funktioniert. Normalfall: Gerät hinzufügen → Poll → UUID wird automatisch aktuell gehalten.',
+
+    // Set Temperature modal
+    modal_set_temp_title: '🌡 Temperaturen setzen',
+    modal_set_temp_loading: 'Lade aktuelle Einstellungen…',
+    modal_comfort_label: 'Heizen (°C)',
+    modal_comfort_hint: '— Temperatur während der Heizzeiten',
+    modal_comfort_placeholder: 'z.B. 22.0',
+    modal_eco_label: 'Absenken (°C)',
+    modal_eco_hint: '— Temperatur außerhalb der Heizzeiten',
+    modal_eco_placeholder: 'z.B. 17.0',
+    modal_offset_label: 'Offset (°C, z.B. -1.5 … +1.5)',
+    modal_child_lock_label: '🔒 Kindersicherung',
+    btn_save: 'Speichern',
+    btn_saving: 'Speichere…',
+    btn_cancel: 'Abbrechen',
+
+    // Schedule modal
+    modal_schedule_title: '⏰ Heizzeiten',
+    modal_schedule_hint: 'Zeiten in 10-Minuten-Schritten. Leere Felder = Periode deaktiviert.',
+    modal_schedule_loading: 'Lade Heizzeiten vom Gerät…',
+    modal_schedule_delete_title: 'Löschen',
+
+    // PIN modal
+    modal_pin_title: 'PIN setzen',
+    modal_pin_desc: 'PIN für',
+    modal_pin_desc2: 'eingeben, prüfen und speichern.',
+    modal_pin_label: 'PIN',
+    modal_pin_placeholder: 'PIN eingeben (Standard: 0)',
+    modal_pin_testing: 'Prüfe…',
+    modal_pin_save: 'Prüfen & Speichern',
+    modal_pin_offline: 'Offline speichern (ohne Test)',
+    modal_pin_offline_title: 'PIN direkt speichern ohne BLE-Verbindung — z.B. wenn Gerät gerade offline ist',
+
+    // Rename modal
+    modal_rename_title: 'Gerät bearbeiten',
+    modal_rename_name_label: 'Name',
+    modal_rename_pin_label: 'PIN',
+    modal_rename_name_placeholder: 'z.B. Wohnzimmer Links',
+    modal_rename_pin_placeholder: 'PIN (leer = unverändert)',
+    modal_rename_mac_label: 'Bluetooth MAC-Adresse',
+    modal_rename_mac_auto: 'Wird automatisch beim nächsten Poll ermittelt.',
+    modal_rename_reset_btn: '🗑 Daten zurücksetzen (Verlauf + Status löschen)',
+    modal_rename_reset_title: 'Löscht Verlauf und gecachten Status. Gerätekonfiguration (Name, PIN, MAC) bleibt erhalten.',
+
+    // Add Device modal
+    modal_add_title: 'Gerät hinzufügen',
+    modal_add_mac_label: 'MAC-Adresse *',
+    modal_add_name_label: 'Name',
+    modal_add_pin_label: 'PIN (optional)',
+    modal_add_name_placeholder: 'Wohnzimmer',
+    modal_add_pin_placeholder: 'Leer lassen wenn kein PIN',
+    modal_add_btn: 'Hinzufügen',
+
+    // Profile modal
+    modal_profile_edit_title: 'Profil bearbeiten',
+    modal_profile_new_title: 'Neues Profil',
+    modal_profile_name_label: 'Name *',
+    modal_profile_name_placeholder: 'z.B. winter',
+    modal_profile_comfort_label: 'Heizen (°C)',
+    modal_profile_comfort_placeholder: 'z.B. 22.0',
+    modal_profile_eco_label: 'Absenken (°C)',
+    modal_profile_eco_placeholder: 'z.B. 17.0',
+    modal_profile_childlock_label: '🔒 Kindersicherung beim Anwenden',
+    modal_profile_childlock_hint: 'Nicht ändern = leer lassen',
+    modal_profile_schedules_label: '⏰ Heizzeiten',
+    modal_profile_schedules_hint: 'Zeiten in 10-Minuten-Schritten. Leere Felder = Periode deaktiviert.',
+    modal_profile_tab_week: 'Wochentage (Mo–Fr)',
+    modal_profile_tab_weekend: 'Wochenende (Sa–So)',
+    modal_profile_tab_individual: 'Individuell',
+    modal_profile_apply_week: '→ Mo–Fr übernehmen',
+    modal_profile_apply_weekend: '→ Sa–So übernehmen',
+    modal_profile_delete_btn: 'Löschen',
+    modal_profile_delete_title_btn: 'Löschen',
+    modal_profile_schedule_delete_title: 'Löschen',
+
+    // Assign modal
+    modal_assign_title: '🔗 Gerät manuell zuordnen',
+    modal_assign_warning: '⚠ Nur als Fallback nötig. Normalerweise erkennt das System nach einem Batteriewechsel die neue UUID automatisch anhand der gespeicherten MAC-Adresse.',
+    modal_assign_new_uuid: 'Gefundene neue UUID:',
+    modal_assign_select_device: 'Welchem gespeicherten Gerät soll diese UUID zugeordnet werden?',
+    modal_assign_select_placeholder: '— Gerät auswählen —',
+    modal_assign_note: 'Die UUID des gewählten Geräts wird durch die neue ersetzt. Alle Daten (Status, Verlauf) bleiben erhalten.',
+    modal_assign_btn: 'Zuordnen & UUID ersetzen',
+
+    // Preset modal
+    modal_preset_edit_title: 'Szene bearbeiten',
+    modal_preset_new_title: 'Neue Szene',
+    modal_preset_name_label: 'Name',
+    modal_preset_name_placeholder: 'z.B. Alltag, Urlaub, Nacht…',
+    modal_preset_device_profile: 'Gerät → Profil',
+    modal_preset_no_change: '— nicht ändern —',
+    modal_preset_set_all: 'Alle gleich setzen…',
+
+    // Preset set-all modal
+    modal_preset_setall_title: 'Alle Geräte auf Profil setzen',
+    modal_preset_setall_select: 'Profil auswählen…',
+    modal_preset_setall_confirm: 'Übernehmen',
+
+    // Apply Profile modal
+    modal_apply_profile_title: 'Profil anwenden',
+    modal_apply_profile_desc: 'Profil',
+    modal_apply_profile_desc2: 'auf folgende Geräte anwenden:',
+    modal_apply_select_all: 'Alle auswählen',
+    modal_apply_select_none: 'Keine',
+    modal_apply_applying: 'Wird angewendet…',
+    modal_apply_btn: 'Anwenden',
+    modal_apply_error_label: 'Fehler',
+
+    // BLE busy / status messages (used in JS too)
+    ble_checking_connection: 'Verbindung wird geprüft…',
+    ble_loading_temps: 'Temperaturen werden geladen…',
+    ble_saving_temps: 'Temperaturen werden gespeichert…',
+    ble_loading_schedule: 'Heizzeiten werden geladen…',
+    ble_saving_schedule: 'Heizzeiten werden gespeichert…',
+    ble_verifying_pin: 'PIN wird geprüft…',
+    ble_setting_childlock: 'Kindersicherung wird gesetzt…',
+    ble_polling_device: 'Gerät wird abgefragt…',
+    ble_rediscovering: 'Suche Gerät per MAC…',
+
+    // Battery tooltip
+    battery_tooltip: 'CometBlue-Batteriewert: Neue Batterien zeigen ~80–90% (nicht 100%), da das Gerät die Rohspannung ohne Kalibrierung ausgibt.',
+
+    // Chart labels
+    chart_current: 'Aktuell',
+    chart_comfort: 'Heizen',
+    chart_eco: 'Absenken',
+    chart_battery: 'Batterie',
+
+    // Toast messages
+    toast_scene_deleted: 'Szene gelöscht.',
+    toast_scene_saved: 'Szene gespeichert.',
+    toast_scene_created: 'Szene erstellt.',
+    toast_scene_applied: 'Szene angewendet.',
+    toast_childlock_err: 'Fehler beim Setzen der Kindersicherung.',
+    toast_preset_apply_err: 'Fehler beim Anwenden.',
+    toast_pin_saved: 'PIN gespeichert.',
+    toast_pin_saved_offline: 'PIN gespeichert (ohne Test).',
+    toast_data_reset: 'Daten zurückgesetzt.',
+    toast_rediscover_err: 'Fehler beim Suchen',
+    toast_uuid_unchanged: 'Gerät gefunden — UUID unverändert',
+    toast_poll_done: 'Poll abgeschlossen',
+    toast_poll_all_done: 'Alle Geräte abgefragt.',
+    toast_apply_err: 'Fehler beim Anwenden.',
+    toast_childlock_on: 'aktiviert',
+    toast_childlock_off: 'deaktiviert',
+    toast_childlock_device: 'Kindersicherung',
+    toast_childlock_all_on: 'Kindersicherung aktiviert für alle Geräte.',
+    toast_childlock_all_off: 'Kindersicherung deaktiviert für alle Geräte.',
+
+    // Validation / error messages in JS
+    err_name_required: 'Name darf nicht leer sein.',
+    err_name_required2: 'Fehler: Name erforderlich.',
+    err_unknown: 'Unbekannt',
+    err_pin_empty: 'Bitte PIN eingeben.',
+    err_pin_wrong: 'PIN falsch. Bitte erneut versuchen.',
+    err_connection: 'Verbindungsfehler. Gerät erreichbar?',
+    err_schedule_times: 'Fehler: Zeiten müssen in 10-Minuten-Schritten sein (z.B. 06:00, 12:10, 17:30)',
+    toast_schedule_saved: '✓ Heizzeiten gespeichert',
+
+    // Alert messages
+    alert_battery_crit: 'Batterie kritisch',
+    alert_battery_low: 'Batterie schwach',
+    alert_auth_failed: 'Authentifizierung fehlgeschlagen (PIN prüfen)',
+    alert_conn_error: 'Verbindungsfehler',
+    alert_no_poll: 'Noch kein Poll — bitte Poll auslösen',
+
+    // Confirm dialogs
+    confirm_delete_scene: 'Szene löschen?',
+    confirm_reset_data: 'Verlauf und gecachten Status für dieses Gerät löschen?\nGerätekonfiguration (Name, PIN, MAC) bleibt erhalten.',
+    confirm_childlock_enable: 'Kindersicherung für alle Geräte aktivieren?',
+    confirm_childlock_disable: 'Kindersicherung für alle Geräte deaktivieren?',
+    confirm_delete_profile: 'Profil "{name}" löschen?',
+    toast_profile_deleted: 'Profil "{name}" gelöscht',
+    toast_device_not_found: 'Gerät nicht gefunden',
+  },
+  en: {
+    // Nav
+    nav_poll_all: 'Poll all',
+    nav_polling: 'Polling…',
+    nav_auto_poll: 'Auto-Poll',
+    nav_title_poll: 'Poll all devices now',
+    nav_title_autopoll: 'Toggle automatic polling',
+    nav_title_debug: 'Debug mode',
+    nav_tab_dashboard: 'Dashboard',
+    nav_tab_monitor: 'Monitor',
+    nav_tab_devices: 'Devices',
+    nav_tab_profiles: 'Profiles',
+    nav_tab_szenen: 'Scenes',
+    nav_tab_discovery: 'Discover',
+
+    // Dashboard
+    dashboard_title: 'Dashboard',
+    dashboard_no_devices: 'No devices configured. Go to',
+    dashboard_discover_link: 'Discover',
+    dash_temp_current: 'Current',
+    dash_temp_comfort: 'Comfort',
+    dash_temp_eco: 'Eco',
+    dash_child_lock: 'Child Lock',
+    dash_child_lock_on: '🔒 ON',
+    dash_child_lock_off: '🔓 OFF',
+    dash_child_lock_enable: 'Enable child lock',
+    dash_child_lock_disable: 'Disable child lock',
+    dash_btn_temps: '🌡 Temperatures',
+    dash_btn_schedule: '⏰ Schedule',
+    dash_btn_polling: 'Polling…',
+    dash_btn_poll: '↻ Poll',
+    dash_never_polled: 'Never polled. Press Poll to fetch data.',
+    dash_rediscover: '🔍 Re-discover (update UUID)',
+
+    // Monitor
+    monitor_title: 'Temperature Monitor',
+    monitor_range: 'Range:',
+    monitor_loading: 'Loading history…',
+    monitor_no_devices: 'No devices configured yet.',
+    monitor_no_data: 'No data yet — waiting for first poll',
+
+    // Devices page
+    devices_title: 'Devices',
+    devices_lock_all: '🔒 Lock all',
+    devices_unlock_all: '🔓 Unlock all',
+    devices_add_btn: '+ Add Device',
+    devices_col_name: 'Name',
+    devices_col_address: 'Address',
+    devices_col_temp: 'Current °C',
+    devices_col_battery: 'Battery',
+    devices_col_seen: 'Last seen',
+    devices_col_actions: 'Actions',
+    devices_no_devices: 'No devices. Add one or use Discover.',
+    devices_action_temps: 'Temps',
+    devices_action_poll: 'Poll',
+    devices_action_polling: 'Polling…',
+    devices_action_remove: 'Remove',
+    devices_lock_all_title: 'Enable child lock for all devices',
+    devices_unlock_all_title: 'Disable child lock for all devices',
+
+    // Profiles page
+    profiles_title: 'Heating Profiles',
+    profiles_new_btn: '+ New Profile',
+    profiles_comfort: 'Comfort',
+    profiles_eco: 'Eco',
+    profiles_schedules_label: '⏰ Schedule',
+    profiles_apply_btn: 'Apply…',
+    profiles_no_profiles: 'No profiles yet. Create one with "+ New Profile".',
+
+    // Szenen / Scenes page
+    szenen_title: 'Scenes',
+    szenen_new_btn: '+ New Scene',
+    szenen_description: 'Each scene assigns a profile to specific devices. One click applies all assignments at once.',
+    szenen_no_scenes: 'No scenes yet. Create one with "+ New Scene".',
+    szenen_edit_title: 'Edit',
+    szenen_delete_title: 'Delete',
+    szenen_devices_count: 'devices',
+    szenen_applying: 'Applying…',
+    szenen_apply_btn: 'Apply Scene',
+
+    // Discovery page
+    discovery_title: 'Discover Devices',
+    discovery_duration: 'Duration:',
+    discovery_scanning: 'Scanning…',
+    discovery_scan_btn: 'Scan',
+    discovery_scan_complete: 'Scan complete',
+    discovery_found: 'device(s) found',
+    discovery_previously: 'Previously Discovered',
+    discovery_last_seen: 'Last seen:',
+    discovery_added: '✓ Added',
+    discovery_add: 'Add',
+    discovery_press_scan: 'Press',
+    discovery_press_scan2: 'to search for CometBlue devices via Bluetooth.',
+    discovery_no_found: 'No CometBlue devices found. Make sure the thermostat is nearby and awake.',
+    discovery_found_so_far: 'Found so far…',
+    discovery_results: 'Scan Results',
+    discovery_already_added: '✓ Added',
+    discovery_add_device: 'Add',
+    discovery_assign_btn: '🔗 Assign…',
+    discovery_assign_title: 'Only needed as fallback if MAC resolution fails. Normal case: Add device → Poll → UUID is kept automatically.',
+
+    // Set Temperature modal
+    modal_set_temp_title: '🌡 Set Temperatures',
+    modal_set_temp_loading: 'Loading current settings…',
+    modal_comfort_label: 'Comfort (°C)',
+    modal_comfort_hint: '— temperature during schedule periods',
+    modal_comfort_placeholder: 'e.g. 22.0',
+    modal_eco_label: 'Eco (°C)',
+    modal_eco_hint: '— temperature outside schedule periods',
+    modal_eco_placeholder: 'e.g. 17.0',
+    modal_offset_label: 'Offset (°C, e.g. -1.5 … +1.5)',
+    modal_child_lock_label: '🔒 Child Lock',
+    btn_save: 'Save',
+    btn_saving: 'Saving…',
+    btn_cancel: 'Cancel',
+
+    // Schedule modal
+    modal_schedule_title: '⏰ Schedule',
+    modal_schedule_hint: 'Times in 10-minute steps. Empty fields = period disabled.',
+    modal_schedule_loading: 'Loading schedule from device…',
+    modal_schedule_delete_title: 'Delete',
+
+    // PIN modal
+    modal_pin_title: 'Set PIN',
+    modal_pin_desc: 'Enter, verify and save PIN for',
+    modal_pin_desc2: '',
+    modal_pin_label: 'PIN',
+    modal_pin_placeholder: 'Enter PIN (default: 0)',
+    modal_pin_testing: 'Verifying…',
+    modal_pin_save: 'Verify & Save',
+    modal_pin_offline: 'Save offline (without test)',
+    modal_pin_offline_title: 'Save PIN directly without BLE connection — e.g. if device is currently offline',
+
+    // Rename modal
+    modal_rename_title: 'Edit Device',
+    modal_rename_name_label: 'Name',
+    modal_rename_pin_label: 'PIN',
+    modal_rename_name_placeholder: 'e.g. Living Room Left',
+    modal_rename_pin_placeholder: 'PIN (leave empty to keep current)',
+    modal_rename_mac_label: 'Bluetooth MAC Address',
+    modal_rename_mac_auto: 'Will be determined automatically on next poll.',
+    modal_rename_reset_btn: '🗑 Reset data (delete history + status)',
+    modal_rename_reset_title: 'Deletes history and cached status. Device configuration (name, PIN, MAC) is preserved.',
+
+    // Add Device modal
+    modal_add_title: 'Add Device',
+    modal_add_mac_label: 'MAC Address *',
+    modal_add_name_label: 'Name',
+    modal_add_pin_label: 'PIN (optional)',
+    modal_add_name_placeholder: 'Living Room',
+    modal_add_pin_placeholder: 'Leave empty if no PIN',
+    modal_add_btn: 'Add',
+
+    // Profile modal
+    modal_profile_edit_title: 'Edit Profile',
+    modal_profile_new_title: 'New Profile',
+    modal_profile_name_label: 'Name *',
+    modal_profile_name_placeholder: 'e.g. winter',
+    modal_profile_comfort_label: 'Comfort (°C)',
+    modal_profile_comfort_placeholder: 'e.g. 22.0',
+    modal_profile_eco_label: 'Eco (°C)',
+    modal_profile_eco_placeholder: 'e.g. 17.0',
+    modal_profile_childlock_label: '🔒 Child Lock when applying',
+    modal_profile_childlock_hint: 'Leave empty = do not change',
+    modal_profile_schedules_label: '⏰ Schedule',
+    modal_profile_schedules_hint: 'Times in 10-minute steps. Empty fields = period disabled.',
+    modal_profile_tab_week: 'Weekdays (Mon–Fri)',
+    modal_profile_tab_weekend: 'Weekend (Sat–Sun)',
+    modal_profile_tab_individual: 'Individual',
+    modal_profile_apply_week: '→ Apply to Mon–Fri',
+    modal_profile_apply_weekend: '→ Apply to Sat–Sun',
+    modal_profile_delete_btn: 'Delete',
+    modal_profile_delete_title_btn: 'Delete',
+    modal_profile_schedule_delete_title: 'Delete',
+
+    // Assign modal
+    modal_assign_title: '🔗 Manually assign device',
+    modal_assign_warning: '⚠ Only needed as a fallback. Normally the system detects the new UUID automatically after a battery change using the stored MAC address.',
+    modal_assign_new_uuid: 'Found new UUID:',
+    modal_assign_select_device: 'Which stored device should this UUID be assigned to?',
+    modal_assign_select_placeholder: '— Select device —',
+    modal_assign_note: 'The UUID of the selected device will be replaced by the new one. All data (status, history) is preserved.',
+    modal_assign_btn: 'Assign & replace UUID',
+
+    // Preset modal
+    modal_preset_edit_title: 'Edit Scene',
+    modal_preset_new_title: 'New Scene',
+    modal_preset_name_label: 'Name',
+    modal_preset_name_placeholder: 'e.g. Everyday, Vacation, Night…',
+    modal_preset_device_profile: 'Device → Profile',
+    modal_preset_no_change: '— no change —',
+    modal_preset_set_all: 'Set all to same…',
+
+    // Preset set-all modal
+    modal_preset_setall_title: 'Set all devices to profile',
+    modal_preset_setall_select: 'Select profile…',
+    modal_preset_setall_confirm: 'Apply',
+
+    // Apply Profile modal
+    modal_apply_profile_title: 'Apply Profile',
+    modal_apply_profile_desc: 'Apply profile',
+    modal_apply_profile_desc2: 'to the following devices:',
+    modal_apply_select_all: 'Select all',
+    modal_apply_select_none: 'None',
+    modal_apply_applying: 'Applying…',
+    modal_apply_btn: 'Apply',
+    modal_apply_error_label: 'Error',
+
+    // BLE busy / status messages
+    ble_checking_connection: 'Checking connection…',
+    ble_loading_temps: 'Loading temperatures…',
+    ble_saving_temps: 'Saving temperatures…',
+    ble_loading_schedule: 'Loading schedule…',
+    ble_saving_schedule: 'Saving schedule…',
+    ble_verifying_pin: 'Verifying PIN…',
+    ble_setting_childlock: 'Setting child lock…',
+    ble_polling_device: 'Polling device…',
+    ble_rediscovering: 'Searching device by MAC…',
+
+    // Battery tooltip
+    battery_tooltip: 'CometBlue battery value: New batteries show ~80–90% (not 100%) because the device outputs raw voltage without calibration.',
+
+    // Chart labels
+    chart_current: 'Current',
+    chart_comfort: 'Comfort',
+    chart_eco: 'Eco',
+    chart_battery: 'Battery',
+
+    // Toast messages
+    toast_scene_deleted: 'Scene deleted.',
+    toast_scene_saved: 'Scene saved.',
+    toast_scene_created: 'Scene created.',
+    toast_scene_applied: 'Scene applied.',
+    toast_childlock_err: 'Error setting child lock.',
+    toast_preset_apply_err: 'Error applying.',
+    toast_pin_saved: 'PIN saved.',
+    toast_pin_saved_offline: 'PIN saved (without test).',
+    toast_data_reset: 'Data reset.',
+    toast_rediscover_err: 'Error searching',
+    toast_uuid_unchanged: 'Device found — UUID unchanged',
+    toast_poll_done: 'Poll complete',
+    toast_poll_all_done: 'All devices polled.',
+    toast_apply_err: 'Error applying.',
+    toast_childlock_on: 'enabled',
+    toast_childlock_off: 'disabled',
+    toast_childlock_device: 'Child Lock',
+    toast_childlock_all_on: 'Child lock enabled for all devices.',
+    toast_childlock_all_off: 'Child lock disabled for all devices.',
+
+    // Validation / error messages in JS
+    err_name_required: 'Name must not be empty.',
+    err_name_required2: 'Error: Name is required.',
+    err_unknown: 'Unknown',
+    err_pin_empty: 'Please enter a PIN.',
+    err_pin_wrong: 'Wrong PIN. Please try again.',
+    err_connection: 'Connection error. Is the device reachable?',
+    err_schedule_times: 'Error: Times must be in 10-minute steps (e.g. 06:00, 12:10, 17:30)',
+    toast_schedule_saved: '✓ Schedule saved',
+
+    // Alert messages
+    alert_battery_crit: 'battery critical',
+    alert_battery_low: 'battery low',
+    alert_auth_failed: 'authentication failed (check PIN)',
+    alert_conn_error: 'connection error',
+    alert_no_poll: 'not yet polled — please trigger a poll',
+
+    // Confirm dialogs
+    confirm_delete_scene: 'Delete scene?',
+    confirm_reset_data: 'Delete history and cached status for this device?\nDevice configuration (name, PIN, MAC) will be preserved.',
+    confirm_childlock_enable: 'Enable child lock for all devices?',
+    confirm_childlock_disable: 'Disable child lock for all devices?',
+    confirm_delete_profile: 'Delete profile "{name}"?',
+    toast_profile_deleted: 'Profile "{name}" deleted',
+    toast_device_not_found: 'Device not found',
+  },
+};
+
 function app() {
   return {
+    lang: localStorage.getItem('lang') || 'de',
+    translations: TRANSLATIONS,
+
+    t(key) {
+      return (this.translations[this.lang] && this.translations[this.lang][key] !== undefined)
+        ? this.translations[this.lang][key]
+        : (this.translations['en'][key] !== undefined ? this.translations['en'][key] : key);
+    },
+
+    setLang(v) {
+      this.lang = v;
+      localStorage.setItem('lang', v);
+    },
+
     page: localStorage.getItem('cb_page') || 'dashboard',
     devices: [],
     profiles: [],
@@ -1335,18 +1901,18 @@ function app() {
         const battery = s.battery;
         // Battery alerts
         if (battery !== null && battery !== undefined && battery !== 255) {
-          if (battery <= 10) alerts.push({id: `${d.address}_bat_crit`, level: 'error', msg: `${name}: Batterie kritisch (${battery}%)`});
-          else if (battery <= 20) alerts.push({id: `${d.address}_bat_low`, level: 'warn', msg: `${name}: Batterie schwach (${battery}%)`});
+          if (battery <= 10) alerts.push({id: `${d.address}_bat_crit`, level: 'error', msg: `${name}: ${this.t('alert_battery_crit')} (${battery}%)`});
+          else if (battery <= 20) alerts.push({id: `${d.address}_bat_low`, level: 'warn', msg: `${name}: ${this.t('alert_battery_low')} (${battery}%)`});
         }
         // Device error / offline
         if (s.error) {
           const isAuth = s.error.includes('auth');
-          const msg = isAuth ? `${name}: Authentifizierung fehlgeschlagen (PIN prüfen)` : `${name}: Verbindungsfehler`;
+          const msg = isAuth ? `${name}: ${this.t('alert_auth_failed')}` : `${name}: ${this.t('alert_conn_error')}`;
           alerts.push({id: `${d.address}_err`, level: isAuth ? 'error' : 'warn', msg});
         }
         // Not polled yet
         if (!s.polled_at && d.added_at) {
-          alerts.push({id: `${d.address}_nopoll`, level: 'info', msg: `${name}: Noch kein Poll — bitte Poll auslösen`});
+          alerts.push({id: `${d.address}_nopoll`, level: 'info', msg: `${name}: ${this.t('alert_no_poll')}`});
         }
       }
       this.alerts = alerts;
@@ -1399,7 +1965,7 @@ function app() {
 
     async submitPreset() {
       this.presetMsg = '';
-      if (!this.presetForm.name.trim()) { this.presetMsg = 'Name darf nicht leer sein.'; return; }
+      if (!this.presetForm.name.trim()) { this.presetMsg = this.t('err_name_required'); return; }
       // Only save non-empty assignments
       const assignments = {};
       Object.entries(this.presetForm.assignments).forEach(([addr, prof]) => { if (prof) assignments[addr] = prof; });
@@ -1410,24 +1976,24 @@ function app() {
       ).catch(() => null);
       if (!res?.ok) {
         const err = await res?.json().catch(() => ({}));
-        this.presetMsg = 'Fehler: ' + (err?.detail || 'Unbekannt');
+        this.presetMsg = 'Error: ' + (err?.detail || this.t('err_unknown'));
         return;
       }
       await this.loadPresets();
       this.showPresetModal = false;
-      this.showToast(this.presetEditId ? 'Szene gespeichert.' : 'Szene erstellt.');
+      this.showToast(this.t(this.presetEditId ? 'toast_scene_saved' : 'toast_scene_created'));
     },
 
     async deletePreset(id) {
-      if (!confirm('Szene löschen?')) return;
+      if (!confirm(this.t('confirm_delete_scene'))) return;
       await fetch(`${API}/api/presets/${id}`, {method: 'DELETE'});
       await this.loadPresets();
-      this.showToast('Szene gelöscht.');
+      this.showToast(this.t('toast_scene_deleted'));
     },
 
     async toggleChildLock(dev) {
       const enabled = !dev.status?.child_lock;
-      this._bleLock('Kindersicherung wird gesetzt…', dev.address);
+      this._bleLock(this.t('ble_setting_childlock'), dev.address);
       const res = await fetch(`${API}/api/devices/${dev.address}/flags`, {
         method: 'PATCH', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({child_lock: enabled}),
@@ -1437,14 +2003,14 @@ function app() {
         // Optimistically update cached status
         const d = this.devices.find(d => d.address === dev.address);
         if (d?.status) d.status.child_lock = enabled ? 1 : 0;
-        this.showToast(`Kindersicherung ${enabled ? 'aktiviert' : 'deaktiviert'}: ${dev.name || dev.address.substring(0,8)}`);
+        this.showToast(`${this.t('toast_childlock_device')} ${enabled ? this.t('toast_childlock_on') : this.t('toast_childlock_off')}: ${dev.name || dev.address.substring(0,8)}`);
       } else {
-        this.showToast('Fehler beim Setzen der Kindersicherung.');
+        this.showToast(this.t('toast_childlock_err'));
       }
     },
 
     async setChildLockAll(enabled) {
-      if (!confirm(`Kindersicherung für alle Geräte ${enabled ? 'aktivieren' : 'deaktivieren'}?`)) return;
+      if (!confirm(this.t(enabled ? 'confirm_childlock_enable' : 'confirm_childlock_disable'))) return;
       this.childLockBusy = true;
       const res = await fetch(`${API}/api/devices/set-child-lock`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -1453,9 +2019,9 @@ function app() {
       this.childLockBusy = false;
       if (res?.ok) {
         await this.loadDevices();
-        this.showToast(`Kindersicherung ${enabled ? 'aktiviert' : 'deaktiviert'} für alle Geräte.`);
+        this.showToast(this.t(enabled ? 'toast_childlock_all_on' : 'toast_childlock_all_off'));
       } else {
-        this.showToast('Fehler beim Setzen der Kindersicherung.');
+        this.showToast(this.t('toast_childlock_err'));
       }
     },
 
@@ -1471,7 +2037,7 @@ function app() {
       this.presetProgress = {...this.presetProgress, [preset.id]: {done: 0, total: 0}};
 
       const res = await fetch(`${API}/api/presets/${preset.id}/apply`, {method: 'POST'}).catch(() => null);
-      if (!res?.ok) { this.presetApplying = null; this.showToast('Fehler beim Anwenden.'); return; }
+      if (!res?.ok) { this.presetApplying = null; this.showToast(this.t('toast_preset_apply_err')); return; }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -1493,7 +2059,7 @@ function app() {
                 this.presetProgress = {...this.presetProgress, [pid]: {done: payload.index, total: payload.total}};
                 this.presetResults = {...this.presetResults, [pid]: {...(this.presetResults[pid] || {}), [payload.address]: 'applying'}};
                 const devName = this.devices.find(d => d.address === payload.address)?.name || payload.address.substring(0,8);
-                this.presetLog = [...this.presetLog, {text: `→ Wird angewendet: ${devName} (${payload.profile})…`, type: 'info'}];
+                this.presetLog = [...this.presetLog, {text: `→ ${this.t('szenen_applying').replace('…','')} ${devName} (${payload.profile})…`, type: 'info'}];
                 this._scrollPresetLog();
               } else if (event === 'result') {
                 const prog = this.presetProgress[pid] || {};
@@ -1519,7 +2085,7 @@ function app() {
 
       this.presetApplying = null;
       await this.loadDevices();
-      this.showToast(`Szene "${preset.name}" angewendet.`);
+      this.showToast(`"${preset.name}" ${this.t('toast_scene_applied')}`);
     },
 
     async loadStatus() {
@@ -1555,9 +2121,15 @@ function app() {
 
       // Draw charts after Alpine renders the canvases
       await this.$nextTick();
+      const chartLabels = {
+        current: this.t('chart_current'),
+        comfort: this.t('chart_comfort'),
+        eco: this.t('chart_eco'),
+        battery: this.t('chart_battery'),
+      };
       for (const dev of this.devices) {
         const records = this.monitorData[dev.address] || [];
-        drawChart('chart-' + dev.address, records, dev.name);
+        drawChart('chart-' + dev.address, records, dev.name, chartLabels);
       }
     },
 
@@ -1652,7 +2224,7 @@ function app() {
       // Only test PIN via BLE if the last poll showed an auth failure.
       // Testing PIN on every open requires a full BLE connection (~45s on Pi 3B+).
       if (dev.pin != null && dev.status?.error?.startsWith('auth_failed')) {
-        this._bleLock('PIN wird geprüft…', dev.address);
+        this._bleLock(this.t('ble_verifying_pin'), dev.address);
         const valid = await this._testStoredPin(dev.address);
         this._bleUnlock(dev.address);
         if (!valid) {
@@ -1675,7 +2247,7 @@ function app() {
     },
 
     async _loadTempForm(address) {
-      this._bleLock('Temperaturen werden geladen…', address);
+      this._bleLock(this.t('ble_loading_temps'), address);
       const data = await fetch(`${API}/api/devices/${address}/temperatures`).then(r => r.json()).catch(() => null);
       this._bleUnlock(address);
       const dev = this.devices.find(d => d.address === address);
@@ -1700,7 +2272,7 @@ function app() {
       this.tempMsg = '';
       this.tempSaving = true;
       const addr = this.selectedDevice.address;
-      this._bleLock('Temperaturen werden gespeichert…', addr);
+      this._bleLock(this.t('ble_saving_temps'), addr);
       const body = {};
       if (this.tempForm.comfort !== '') body.comfort = parseFloat(this.tempForm.comfort);
       if (this.tempForm.eco     !== '') body.eco     = parseFloat(this.tempForm.eco);
@@ -1711,7 +2283,7 @@ function app() {
       // Also update child_lock if changed
       const origLock = this.devices.find(d => d.address === addr)?.status?.child_lock ?? false;
       if (res.ok && this.tempForm.child_lock !== origLock) {
-        this._bleLock('Kindersicherung wird gesetzt…', addr);
+        this._bleLock(this.t('ble_setting_childlock'), addr);
         await fetch(`${API}/api/devices/${addr}/flags`, {
           method: 'PATCH', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({child_lock: this.tempForm.child_lock}),
@@ -1737,15 +2309,22 @@ function app() {
 
     // ── Schedule ─────────────────────────────────────────────────
 
+    _dayLabels() {
+      const de = {monday:'Montag',tuesday:'Dienstag',wednesday:'Mittwoch',thursday:'Donnerstag',friday:'Freitag',saturday:'Samstag',sunday:'Sonntag'};
+      const en = {monday:'Monday',tuesday:'Tuesday',wednesday:'Wednesday',thursday:'Thursday',friday:'Friday',saturday:'Saturday',sunday:'Sunday'};
+      return this.lang === 'de' ? de : en;
+    },
+
     _emptyScheduleForm() {
+      const labels = this._dayLabels();
       return [
-        {day: 'monday',    label: 'Montag'},
-        {day: 'tuesday',   label: 'Dienstag'},
-        {day: 'wednesday', label: 'Mittwoch'},
-        {day: 'thursday',  label: 'Donnerstag'},
-        {day: 'friday',    label: 'Freitag'},
-        {day: 'saturday',  label: 'Samstag'},
-        {day: 'sunday',    label: 'Sonntag'},
+        {day: 'monday',    label: labels.monday},
+        {day: 'tuesday',   label: labels.tuesday},
+        {day: 'wednesday', label: labels.wednesday},
+        {day: 'thursday',  label: labels.thursday},
+        {day: 'friday',    label: labels.friday},
+        {day: 'saturday',  label: labels.saturday},
+        {day: 'sunday',    label: labels.sunday},
       ].map(d => ({...d, periods: [{start:'',end:''},{start:'',end:''},{start:'',end:''},{start:'',end:''}]}));
     },
 
@@ -1755,7 +2334,7 @@ function app() {
       this.scheduleLoading = true;
       this.scheduleMsg = '';
       this.scheduleForm = this._emptyScheduleForm();
-      this._bleLock('Heizzeiten werden geladen…', dev.address);
+      this._bleLock(this.t('ble_loading_schedule'), dev.address);
 
       const data = await fetch(`${API}/api/devices/${dev.address}/schedules`)
         .then(r => r.json()).catch(() => null);
@@ -1788,7 +2367,7 @@ function app() {
       for (const row of this.scheduleForm) {
         for (const p of row.periods) {
           if ((p.start && !this.validTime(p.start)) || (p.end && !this.validTime(p.end))) {
-            this.scheduleMsg = 'Fehler: Zeiten müssen in 10-Minuten-Schritten sein (z.B. 06:00, 12:10, 17:30)';
+            this.scheduleMsg = this.t('err_schedule_times');
             return;
           }
         }
@@ -1796,7 +2375,7 @@ function app() {
       this.scheduleSaving = true;
       this.scheduleMsg = '';
       const schedAddr = this.selectedDevice.address;
-      this._bleLock('Heizzeiten werden gespeichert…', schedAddr);
+      this._bleLock(this.t('ble_saving_schedule'), schedAddr);
       const body = {};
       for (const row of this.scheduleForm) {
         body[row.day] = row.periods.filter(p => p.start && p.end);
@@ -1807,7 +2386,7 @@ function app() {
       this._bleUnlock(schedAddr);
       this.scheduleSaving = false;
       if (res?.status === 'ok') {
-        this.scheduleMsg = '✓ Heizzeiten gespeichert';
+        this.scheduleMsg = this.t('toast_schedule_saved');
         setTimeout(() => { this.showSchedule = false; this.scheduleMsg = ''; }, 1500);
       } else {
         this.scheduleMsg = 'Error: ' + (res?.detail || 'Unbekannter Fehler');
@@ -1828,17 +2407,17 @@ function app() {
     },
 
     async submitPinPrompt() {
-      if (this.pinPromptForm.pin === '') { this.pinPromptMsg = 'Bitte PIN eingeben.'; return; }
+      if (this.pinPromptForm.pin === '') { this.pinPromptMsg = this.t('err_pin_empty'); return; }
       this.pinPromptMsg = ''; this.pinPromptTesting = true;
       const pinAddr = this.selectedDevice.address;
-      this._bleLock('PIN wird geprüft…', pinAddr);
+      this._bleLock(this.t('ble_verifying_pin'), pinAddr);
       const pin = parseInt(this.pinPromptForm.pin);
       const raw = await fetch(`${API}/api/devices/${pinAddr}/test-pin`, {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({pin}),
       }).catch(() => null);
       this._bleUnlock(pinAddr);
       this.pinPromptTesting = false;
-      if (!raw) { this.pinPromptMsg = 'Verbindungsfehler. Gerät erreichbar?'; return; }
+      if (!raw) { this.pinPromptMsg = this.t('err_connection'); return; }
       if (!raw.ok && raw.status !== 200) {
         const err = await raw.json().catch(() => ({}));
         this.pinPromptMsg = 'BLE-Fehler: ' + (err.detail || raw.statusText);
@@ -1858,9 +2437,9 @@ function app() {
           this.tempLoading = false;
         }
         await this.loadDevices();
-        this.showToast('PIN gespeichert.');
+        this.showToast(this.t('toast_pin_saved'));
       } else {
-        this.pinPromptMsg = 'PIN falsch. Bitte erneut versuchen.';
+        this.pinPromptMsg = this.t('err_pin_wrong');
       }
     },
 
@@ -1876,7 +2455,7 @@ function app() {
     async submitRename() {
       this.renameMsg = '';
       const name = this.renameForm.name.trim();
-      if (!name) { this.renameMsg = 'Name darf nicht leer sein.'; return; }
+      if (!name) { this.renameMsg = this.t('err_name_required'); return; }
       const body = {name};
       if (this.renameForm.pin !== '') body.pin = parseInt(this.renameForm.pin);
       const res = await fetch(`${API}/api/devices/${this.renameDevice.address}`, {
@@ -1893,7 +2472,7 @@ function app() {
     },
 
     async savePinWithoutTest() {
-      if (this.pinPromptForm.pin === '') { this.pinPromptMsg = 'Bitte PIN eingeben.'; return; }
+      if (this.pinPromptForm.pin === '') { this.pinPromptMsg = this.t('err_pin_empty'); return; }
       const pin = parseInt(this.pinPromptForm.pin);
       await fetch(`${API}/api/devices/${this.selectedDevice.address}`, {
         method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({pin}),
@@ -1901,15 +2480,15 @@ function app() {
       this.selectedDevice.pin = pin;
       this.showPinPrompt = false;
       await this.loadDevices();
-      this.showToast('PIN gespeichert (ohne Test).');
+      this.showToast(this.t('toast_pin_saved_offline'));
     },
 
     async resetDeviceData(address) {
-      if (!confirm('Verlauf und gecachten Status für dieses Gerät löschen?\nGerätekonfiguration (Name, PIN, MAC) bleibt erhalten.')) return;
+      if (!confirm(this.t('confirm_reset_data'))) return;
       await fetch(`${API}/api/devices/${address}/reset`, {method: 'POST'});
       this.showRename = false;
       await this.loadDevices();
-      this.showToast('Daten zurückgesetzt.');
+      this.showToast(this.t('toast_data_reset'));
     },
 
     // ── Add Device ───────────────────────────────────────────────
@@ -1959,19 +2538,19 @@ function app() {
     },
 
     async rediscoverDevice(dev) {
-      this._bleLock('Suche Gerät per MAC…', dev.address);
+      this._bleLock(this.t('ble_rediscovering'), dev.address);
       const res = await fetch(`${API}/api/devices/${dev.address}/rediscover`, {method: 'POST'})
         .then(r => r.json()).catch(() => null);
       this._bleUnlock(dev.address);
-      if (!res) { this.showToast('Fehler beim Suchen'); return; }
+      if (!res) { this.showToast(this.t('toast_rediscover_err')); return; }
       if (res.status === 'updated') {
         this.showToast(`UUID aktualisiert: ${res.new_address}`);
         await this.loadDevices();
       } else if (res.status === 'unchanged') {
-        this.showToast('Gerät gefunden — UUID unverändert');
+        this.showToast(this.t('toast_uuid_unchanged'));
         await this.loadDevices();
       } else {
-        this.showToast('Gerät nicht gefunden: ' + (res.detail || JSON.stringify(res)));
+        this.showToast(this.t('toast_device_not_found') + ': ' + (res.detail || JSON.stringify(res)));
       }
     },
 
@@ -1983,7 +2562,7 @@ function app() {
           fetch(`${API}/api/devices/${d.address}/poll`, {method: 'POST'}).catch(() => null)
         ));
         await this.loadDevices();
-        this.showToast('Alle Geräte abgefragt.');
+        this.showToast(this.t('toast_poll_all_done'));
       } finally {
         this.pollingAll = false;
       }
@@ -1992,11 +2571,11 @@ function app() {
     async pollDevice(address) {
       if (this.pollingDevices[address] || this.busyDevices[address]) return;
       this.pollingDevices[address] = true;
-      this._bleLock('Gerät wird abgefragt…', address);
+      this._bleLock(this.t('ble_polling_device'), address);
       try {
         await fetch(`${API}/api/devices/${address}/poll`, {method: 'POST'});
         await this.loadDevices();
-        this.showToast('Poll abgeschlossen');
+        this.showToast(this.t('toast_poll_done'));
       } finally {
         this._bleUnlock(address);
         delete this.pollingDevices[address];
@@ -2006,14 +2585,15 @@ function app() {
     // ── Profiles ─────────────────────────────────────────────────
 
     _emptyProfileScheduleForm() {
+      const labels = this._dayLabels();
       return [
-        {day: 'monday',    label: 'Montag'},
-        {day: 'tuesday',   label: 'Dienstag'},
-        {day: 'wednesday', label: 'Mittwoch'},
-        {day: 'thursday',  label: 'Donnerstag'},
-        {day: 'friday',    label: 'Freitag'},
-        {day: 'saturday',  label: 'Samstag'},
-        {day: 'sunday',    label: 'Sonntag'},
+        {day: 'monday',    label: labels.monday},
+        {day: 'tuesday',   label: labels.tuesday},
+        {day: 'wednesday', label: labels.wednesday},
+        {day: 'thursday',  label: labels.thursday},
+        {day: 'friday',    label: labels.friday},
+        {day: 'saturday',  label: labels.saturday},
+        {day: 'sunday',    label: labels.sunday},
       ].map(d => ({...d, periods: [{start:'',end:''},{start:'',end:''},{start:'',end:''},{start:'',end:''}]}));
     },
 
@@ -2029,7 +2609,9 @@ function app() {
     },
 
     profileDayLabel(day) {
-      const map = {monday:'Mo',tuesday:'Di',wednesday:'Mi',thursday:'Do',friday:'Fr',saturday:'Sa',sunday:'So'};
+      const de = {monday:'Mo',tuesday:'Di',wednesday:'Mi',thursday:'Do',friday:'Fr',saturday:'Sa',sunday:'So'};
+      const en = {monday:'Mon',tuesday:'Tue',wednesday:'Wed',thursday:'Thu',friday:'Fri',saturday:'Sat',sunday:'Sun'};
+      const map = this.lang === 'de' ? de : en;
       return map[day] || day;
     },
 
@@ -2088,7 +2670,7 @@ function app() {
     async submitProfileModal() {
       this.profileMsg = '';
       const name = this.profileForm.name.trim();
-      if (!name) { this.profileMsg = 'Fehler: Name erforderlich.'; return; }
+      if (!name) { this.profileMsg = this.t('err_name_required2'); return; }
       const body = {name};
       if (this.profileForm.comfort_temp !== '') body.comfort_temp = parseFloat(this.profileForm.comfort_temp);
       if (this.profileForm.eco_temp     !== '') body.eco_temp     = parseFloat(this.profileForm.eco_temp);
@@ -2117,12 +2699,12 @@ function app() {
     },
 
     async deleteProfile(name) {
-      if (!confirm(`Profil "${name}" löschen?`)) return;
+      if (!confirm(this.t('confirm_delete_profile').replace('{name}', name))) return;
       const res = await fetch(`${API}/api/profiles/${encodeURIComponent(name)}`, {method: 'DELETE'});
       if (res.ok) {
         this.showProfileModal = false;
         await this.loadProfiles();
-        this.showToast(`Profil "${name}" gelöscht`);
+        this.showToast(this.t('toast_profile_deleted').replace('{name}', name));
       } else {
         const err = await res.json().catch(() => ({}));
         this.profileMsg = 'Error: ' + (err.detail || res.statusText);
@@ -2151,7 +2733,7 @@ function app() {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({devices: this.applyProfileTargets, apply_schedules: true}),
       }).catch(() => null);
-      if (!res?.ok) { this.applyProfileApplying = false; this.applyProfileMsg = 'Fehler beim Anwenden.'; return; }
+      if (!res?.ok) { this.applyProfileApplying = false; this.applyProfileMsg = this.t('toast_apply_err'); return; }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -2171,7 +2753,7 @@ function app() {
               if (event === 'progress') {
                 this.applyProfileResults = {...this.applyProfileResults, [payload.address]: 'applying'};
                 const devName = this.devices.find(d => d.address === payload.address)?.name || payload.address.substring(0,8);
-                this.applyProfileLog = [...this.applyProfileLog, {text: `→ Wird angewendet: ${devName}…`, type: 'info'}];
+                this.applyProfileLog = [...this.applyProfileLog, {text: `→ ${this.t('szenen_applying').replace('…','')} ${devName}…`, type: 'info'}];
                 setTimeout(() => { const el = document.getElementById('applyProfileLogEl'); if (el) el.scrollTop = el.scrollHeight; }, 0);
               } else if (event === 'result') {
                 this.applyProfileResults = {...this.applyProfileResults, [payload.address]: payload.status};
@@ -2195,9 +2777,9 @@ function app() {
       await this.loadDevices();
       const errors = Object.entries(this.applyProfileResults).filter(([,v]) => v !== 'ok');
       if (errors.length) {
-        this.applyProfileMsg = `Fehler bei ${errors.length} Gerät(en)`;
+        this.applyProfileMsg = `${this.t('toast_apply_err')} (${errors.length} ${this.t('szenen_devices_count')})`;
       } else {
-        this.applyProfileMsg = `✓ Auf ${this.applyProfileTargets.length} Gerät(e) angewendet`;
+        this.applyProfileMsg = `✓ ${this.applyProfileTargets.length} ${this.t('szenen_devices_count')}`;
         setTimeout(() => { this.showApplyProfile = false; this.applyProfileMsg = ''; }, 1500);
       }
     },
