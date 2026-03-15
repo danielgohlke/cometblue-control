@@ -8,6 +8,8 @@ Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI �
 
 > **Web UI language:** English / German switchable in the nav bar
 
+> **Platform status:** macOS — stable · Linux/Raspberry Pi — alpha (BLE stack quirks may require occasional service restarts)
+
 ---
 
 ## Features
@@ -169,6 +171,18 @@ Up to 4 time periods per day. Omit a day to leave its schedule unchanged when ap
 | `aus` | 8.0 °C | 8.0 °C | Frost protection / off |
 | `weekend` | 22.0 °C | 17.0 °C | Extended weekend times |
 | `weekday` | 22.0 °C | 17.0 °C | Compact weekday times |
+
+---
+
+## Screenshots
+
+| Dashboard | Monitor |
+|-----------|---------|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Monitor](docs/screenshots/monitor.png) |
+
+| Profiles | Scenes |
+|----------|--------|
+| ![Profiles](docs/screenshots/profiles.png) | ![Scenes](docs/screenshots/scenes.png) |
 
 ---
 
@@ -572,63 +586,73 @@ sudo usermod -aG bluetooth $USER
 
 ## BLE Protocol Reference
 
-CometBlue uses a proprietary BLE GATT profile alongside standard Device Information Service characteristics.
+CometBlue uses a proprietary BLE GATT profile. Full protocol documentation by Torsten Tränkner:
+https://www.torsten-traenkner.de/wissen/smarthome/heizung.php
 
-### UUIDs
+### GATT Characteristics
 
-| UUID | Name | R/W | Description |
-|---|---|---|---|
-| `47e9ee01-47e9-11e4-8939-164230d1df67` | datetime | R/W | 5 bytes: min, hour, day, month, year-2000 |
-| `47e9ee2a-47e9-11e4-8939-164230d1df67` | flags | R/W | Device status flags (child lock, manual mode, …) |
-| `47e9ee2b-47e9-11e4-8939-164230d1df67` | temperatures | R/W | 7 signed bytes (÷2 = °C) |
-| `47e9ee2c-47e9-11e4-8939-164230d1df67` | battery | R | 1 byte (255 = unavailable) |
-| `47e9ee2d-47e9-11e4-8939-164230d1df67` | firmware_revision2 | R | String |
-| `47e9ee2e-47e9-11e4-8939-164230d1df67` | lcd_timer | R/W | LCD timeout |
-| `47e9ee30-47e9-11e4-8939-164230d1df67` | pin | W | PIN authentication (4-byte LE) |
-| `47e9ee10` … `47e9ee16` | day[1–7] | R/W | Weekly schedule, 8 bytes each |
-| `47e9ee20` … `47e9ee27` | holiday[1–8] | R/W | Holiday slots, 9 bytes each |
+All custom characteristics share the base UUID `47e9ee__-47e9-11e4-8939-164230d1df67` where `__` is the suffix below.
 
-### Temperature encoding
+| Suffix | Name | R/W | Description |
+|--------|------|-----|-------------|
+| `ee01` | datetime | R/W | 5 bytes: minute, hour, day, month, year−2000 |
+| `ee2a` | flags | R/W | Status bitmap: child lock, manual mode, DST, anti-frost |
+| `ee2b` | temperatures | R/W | 7 signed bytes — each value ÷ 2 = °C (see below) |
+| `ee2c` | battery | R | 1 byte: 0–100 (%), 255 = unavailable |
+| `ee2d` | firmware_revision2 | R | String |
+| `ee2e` | lcd_timer | R/W | LCD backlight timeout |
+| `ee30` | pin | W | PIN authentication, 4-byte little-endian |
+| `ee10`–`ee16` | day 1–7 (Mon–Sun) | R/W | Weekly schedule, 8 bytes per day (see below) |
+| `ee20`–`ee27` | holiday 1–8 | R/W | Holiday slots, 9 bytes each (see below) |
 
-7 bytes, each value × 2 = °C. Use `0x80` as placeholder for "do not change":
+### Temperature characteristic (suffix `ee2b`)
 
-```
-byte 0: current temperature (read-only)
-byte 1: manual setpoint
-byte 2: comfort setpoint
-byte 3: eco setpoint
-byte 4: temperature offset
-byte 5: window open flag
-byte 6: window open duration (minutes)
-```
+7 bytes. Each value is stored as `raw = °C × 2` (signed). Write `0x80` to leave a value unchanged.
 
-### Flags encoding
+| Byte | Field | Notes |
+|------|-------|-------|
+| 0 | Current temperature | Read-only — measured room temperature |
+| 1 | Manual setpoint | Active when device is in manual mode |
+| 2 | Comfort setpoint | Active during scheduled "on" periods |
+| 3 | Eco setpoint | Active outside scheduled periods |
+| 4 | Offset | Calibration offset added to measured temperature |
+| 5 | Window open temperature | Temperature to drop to when window-open is detected |
+| 6 | Window open duration | Minutes to stay at window temperature |
 
-3 bytes. Relevant bits:
+### Flags characteristic (suffix `ee2a`)
 
-```
-byte 0, bit 7 (0x80): child lock  — 0x80=ON, 0x00=OFF (confirmed empirically)
-byte 0, bit 0 (0x01): DST active
-byte 0, bit 2 (0x04): anti-frost
-byte 1, bit 1 (0x02): manual mode
-```
+3 bytes. Relevant bits (empirically confirmed):
 
-Reading and writing flags requires PIN authentication first.
+| Byte | Bit | Mask | Meaning |
+|------|-----|------|---------|
+| 0 | 7 | `0x80` | Child lock (1 = locked) |
+| 0 | 0 | `0x01` | DST active |
+| 0 | 2 | `0x04` | Anti-frost mode |
+| 1 | 1 | `0x02` | Manual mode |
 
-### Schedule encoding
+Requires PIN authentication before read/write.
 
-8 bytes = 4 × (start, end), each in 10-minute increments (0 = 00:00, 144 = 24:00). `0xFF` = period disabled.
+### Schedule characteristic (suffixes `ee10`–`ee16`)
+
+8 bytes = 4 time periods. Each period is 2 bytes: `(start, end)` in 10-minute steps (0 = 00:00, 144 = 24:00). Unused periods use `0xFF`.
+
+Example: `07:00–22:00` → start = 42, end = 132.
+
+### Holiday characteristic (suffixes `ee20`–`ee27`)
+
+9 bytes encoding a start datetime (5 bytes), end datetime (4 bytes), and target temperature (1 byte, ÷2 = °C). Write all zeros to clear a slot.
 
 ### PIN authentication
 
-Write a 4-byte little-endian encoded PIN to the `pin` characteristic before accessing protected operations. Example: PIN `1234` → `0xD2040000`.
+Before accessing protected characteristics (temperatures, schedules, flags), write the PIN as a 4-byte little-endian integer to suffix `ee30`. Example: PIN `1234` (decimal) → bytes `D2 04 00 00`.
 
-### macOS UUID behaviour
+### Device addressing on macOS
 
-On macOS, CoreBluetooth assigns a random UUID per device instead of exposing the real MAC address. This UUID changes after a battery replacement. CometBlue Control handles this automatically:
+On macOS, CoreBluetooth does **not** expose real Bluetooth MAC addresses. Instead it assigns a random UUID per device that is stable per Mac but changes after a battery replacement.
 
-1. After the first successful (authenticated) poll, the real MAC is read from the System ID characteristic and stored.
-2. On subsequent polls, if the stored UUID is not found, a BLE scan is run to find the device by MAC address, and the UUID is updated in the database automatically.
+CometBlue Control handles this automatically:
+1. After the first successful poll, the real MAC address is read from the standard **System ID** GATT characteristic and stored in the database.
+2. If the stored UUID is no longer found (e.g. after a battery swap), a BLE scan matches the device by MAC address and the UUID is updated automatically.
 
 ---
 
