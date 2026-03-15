@@ -73,6 +73,7 @@ class ProfileOut(BaseModel):
     comfort_temp: Optional[float] = None
     eco_temp: Optional[float] = None
     manual_temp: Optional[float] = None
+    child_lock: Optional[bool] = None
     schedules: Optional[dict] = None
 
 

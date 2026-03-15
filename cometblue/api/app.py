@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .. import database as db, scheduler, config
-from .routes import devices, temperatures, schedules, holidays, profiles, discovery, history, settings
+from .routes import devices, temperatures, schedules, holidays, profiles, discovery, history, settings, presets
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(discovery.router)
     app.include_router(history.router)
     app.include_router(settings.router)
+    app.include_router(presets.router)
 
     # System status
     @app.get("/api/status", tags=["system"])

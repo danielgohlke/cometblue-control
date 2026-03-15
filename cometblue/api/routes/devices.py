@@ -146,6 +146,34 @@ async def set_flags(address: str, body: models.FlagsSet):
     return {"status": "ok"}
 
 
+class ChildLockAllBody(BaseModel):
+    enabled: bool
+    addresses: list[str] = ["all"]
+
+
+@router.post("/set-child-lock")
+async def set_child_lock_bulk(body: ChildLockAllBody):
+    """Set child lock on multiple or all devices."""
+    if "all" in body.addresses:
+        all_devs = await db.list_devices()
+        targets = all_devs
+    else:
+        targets = [d for d in await db.list_devices() if d["address"].upper() in [a.upper() for a in body.addresses]]
+
+    results = {}
+    for device in targets:
+        address = device["address"]
+        try:
+            async with CometBlueDevice(address, pin=device.get("pin"), adapter=device.get("adapter"),
+                                       mac_address=device.get("mac_address")) as dev:
+                await dev.set_child_lock(body.enabled)
+            results[address] = "ok"
+        except Exception as e:
+            results[address] = str(e)
+
+    return {"status": "done", "enabled": body.enabled, "results": results}
+
+
 class AssignAddressBody(BaseModel):
     new_address: str
 

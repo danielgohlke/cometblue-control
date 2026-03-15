@@ -32,7 +32,7 @@
 <nav class="bg-blue-700 text-white shadow-md">
   <div class="max-w-6xl mx-auto px-4 flex items-center gap-1 h-14">
     <span class="font-bold text-lg tracking-wide mr-4">🔥 CometBlue</span>
-    <template x-for="tab in ['dashboard','monitor','devices','profiles','discovery']" :key="tab">
+    <template x-for="tab in ['dashboard','monitor','devices','profiles','szenen','discovery']" :key="tab">
       <button @click="page=tab; localStorage.setItem('cb_page',tab); onPageChange(tab)"
         :class="page===tab ? 'border-b-2 border-white bg-blue-800' : 'opacity-70 hover:opacity-100'"
         class="relative px-3 py-1 text-sm font-medium rounded-t capitalize">
@@ -149,11 +149,15 @@
               <span class="text-sm text-gray-500">Absenken</span>
               <span class="text-sm text-blue-500" x-text="fmt(dev.status?.temp_eco) + ' °C'"></span>
             </div>
-            <div x-show="dev.status?.child_lock != null" class="flex justify-between">
+            <div x-show="dev.status?.child_lock != null" class="flex justify-between items-center">
               <span class="text-sm text-gray-500">Kindersicherung</span>
-              <span class="text-sm font-medium"
-                :class="dev.status?.child_lock ? 'text-orange-600' : 'text-gray-400'"
-                x-text="dev.status?.child_lock ? '🔒 AN' : '🔓 AUS'"></span>
+              <button @click="toggleChildLock(dev)"
+                :disabled="busyDevices[dev.address]"
+                :title="dev.status?.child_lock ? 'Kindersicherung deaktivieren' : 'Kindersicherung aktivieren'"
+                class="text-sm font-medium px-2 py-0.5 rounded transition-colors"
+                :class="dev.status?.child_lock ? 'text-orange-600 hover:bg-orange-50' : 'text-gray-400 hover:bg-gray-100'">
+                <span x-text="dev.status?.child_lock ? '🔒 AN' : '🔓 AUS'"></span>
+              </button>
             </div>
             <!-- Debug section -->
             <template x-if="debugMode && dev.status">
@@ -277,9 +281,22 @@
 
   <!-- ══════════════════ DEVICES ══════════════════ -->
   <div x-show="page === 'devices'">
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
       <h1 class="text-2xl font-bold">Devices</h1>
-      <button @click="showAddDevice=true" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">+ Add Device</button>
+      <div class="flex items-center gap-2">
+        <button @click="setChildLockAll(true)" :disabled="childLockBusy"
+          title="Kindersicherung für alle Geräte aktivieren"
+          class="flex items-center gap-1 text-xs px-3 py-1.5 rounded border border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50 transition-colors">
+          <svg x-show="childLockBusy" class="spinner w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+          🔒 Alle sperren
+        </button>
+        <button @click="setChildLockAll(false)" :disabled="childLockBusy"
+          title="Kindersicherung für alle Geräte deaktivieren"
+          class="flex items-center gap-1 text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors">
+          🔓 Alle entsperren
+        </button>
+        <button @click="showAddDevice=true" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">+ Add Device</button>
+      </div>
     </div>
 
     <div class="bg-white rounded-xl shadow overflow-hidden">
@@ -372,6 +389,75 @@
         </div>
       </template>
       <div x-show="profiles.length === 0" class="col-span-3 text-gray-400 italic">No profiles yet. Create one with "+ New Profile".</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ SZENEN ══════════════════ -->
+  <div x-show="page === 'szenen'">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">Szenen</h1>
+      <button @click="openNewPreset()" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">+ Neue Szene</button>
+    </div>
+    <p class="text-sm text-gray-500 mb-5">Jede Szene weist bestimmten Geräten ein Profil zu. Mit einem Klick werden alle Zuweisungen gleichzeitig angewendet.</p>
+
+    <div x-show="presets.length === 0" class="text-gray-400 italic">Noch keine Szenen. Erstelle eine mit "+ Neue Szene".</div>
+
+    <div class="space-y-4">
+      <template x-for="preset in presets" :key="preset.id">
+        <div class="bg-white rounded-xl shadow border border-gray-100 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="font-semibold text-lg" x-text="preset.name"></div>
+            <div class="flex gap-2">
+              <button @click="openEditPreset(preset)"
+                class="text-gray-400 hover:text-blue-500 p-1" title="Bearbeiten">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              </button>
+              <button @click="deletePreset(preset.id)"
+                class="text-gray-400 hover:text-red-500 p-1" title="Löschen">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </div>
+          <!-- Assignment overview -->
+          <div class="grid grid-cols-2 gap-x-6 gap-y-1 mb-4">
+            <template x-for="dev in devices" :key="dev.address">
+              <div class="flex items-center justify-between text-sm py-0.5 border-b border-gray-50">
+                <span class="text-gray-700" x-text="dev.name || dev.address.substring(0,8)"></span>
+                <span class="font-medium"
+                  :class="preset.assignments[dev.address] ? 'text-blue-600' : 'text-gray-300'"
+                  x-text="preset.assignments[dev.address] || '—'"></span>
+              </div>
+            </template>
+          </div>
+          <!-- Per-device live results -->
+          <div x-show="presetResults[preset.id] && Object.keys(presetResults[preset.id]).length > 0" class="text-xs mb-3 space-y-0.5">
+            <template x-for="[addr, res] in Object.entries(presetResults[preset.id] || {})" :key="addr">
+              <div class="flex gap-2 items-center">
+                <span x-show="res === 'applying'" class="spinner inline-block w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full"></span>
+                <span :class="res === 'ok' ? 'text-green-600' : res === 'applying' ? 'text-blue-500' : 'text-red-500'"
+                  x-text="(res === 'ok' ? '✓ ' : res === 'applying' ? '' : '✗ ') + (devices.find(d=>d.address===addr)?.name || addr.substring(0,8)) + (res !== 'ok' && res !== 'applying' ? ': ' + res : '')"></span>
+              </div>
+            </template>
+          </div>
+          <!-- Progress bar -->
+          <div x-show="presetApplying === preset.id && (presetProgress[preset.id]?.total || 0) > 0" class="mb-3">
+            <div class="flex justify-between text-xs text-gray-500 mb-1">
+              <span x-text="'Gerät ' + (presetProgress[preset.id]?.done || 0) + ' / ' + (presetProgress[preset.id]?.total || 0)"></span>
+              <span x-text="Math.round(((presetProgress[preset.id]?.done || 0) / (presetProgress[preset.id]?.total || 1)) * 100) + '%'"></span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div class="progress-bar h-2 bg-blue-500 rounded-full"
+                :style="'width:' + Math.round(((presetProgress[preset.id]?.done || 0) / (presetProgress[preset.id]?.total || 1)) * 100) + '%'"></div>
+            </div>
+          </div>
+          <button @click="applyPreset(preset)"
+            :disabled="presetApplying === preset.id"
+            class="w-full bg-blue-600 text-white rounded px-3 py-1.5 text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
+            <svg x-show="presetApplying === preset.id" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+            <span x-text="presetApplying === preset.id ? 'Wird angewendet…' : 'Szene anwenden'"></span>
+          </button>
+        </div>
+      </template>
     </div>
   </div>
 
@@ -696,6 +782,24 @@
               class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="z.B. 17.0">
           </label>
         </div>
+        <!-- Kindersicherung -->
+        <div class="flex items-center justify-between py-2 border-t">
+          <div>
+            <span class="text-sm text-gray-700">🔒 Kindersicherung beim Anwenden</span>
+            <div class="text-xs text-gray-400">Nicht ändern = leer lassen</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="profileForm.child_lock = null"
+              :class="profileForm.child_lock === null ? 'bg-gray-300 text-gray-800' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'"
+              class="text-xs px-2 py-1 rounded transition-colors">—</button>
+            <button @click="profileForm.child_lock = false"
+              :class="profileForm.child_lock === false ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'"
+              class="text-xs px-2 py-1 rounded transition-colors">🔓 Aus</button>
+            <button @click="profileForm.child_lock = true"
+              :class="profileForm.child_lock === true ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'"
+              class="text-xs px-2 py-1 rounded transition-colors">🔒 An</button>
+          </div>
+        </div>
       </div>
 
       <!-- Heizzeiten -->
@@ -821,6 +925,64 @@
         Zuordnen & UUID ersetzen
       </button>
       <button @click="showAssignModal=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preset Edit Modal -->
+<div x-show="showPresetModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showPresetModal=false">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4 max-h-[90vh] flex flex-col">
+    <h2 class="text-lg font-bold mb-4" x-text="presetEditId ? 'Szene bearbeiten' : 'Neue Szene'"></h2>
+    <label class="block mb-4">
+      <span class="text-sm text-gray-600">Name</span>
+      <input type="text" x-model="presetForm.name"
+        class="mt-1 block w-full border-2 border-blue-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+        placeholder="z.B. Alltag, Urlaub, Nacht…">
+    </label>
+    <div class="text-sm font-medium text-gray-600 mb-2">Gerät → Profil</div>
+    <div class="overflow-y-auto flex-1 space-y-2 mb-4">
+      <template x-for="dev in devices" :key="dev.address">
+        <div class="flex items-center gap-3">
+          <span class="text-sm flex-1 truncate" x-text="dev.name || dev.address.substring(0,8)"></span>
+          <select x-model="presetForm.assignments[dev.address]"
+            class="border rounded px-2 py-1 text-sm w-36 focus:outline-none focus:border-blue-400">
+            <option value="">— nicht ändern —</option>
+            <template x-for="p in profiles" :key="p.name">
+              <option :value="p.name" x-text="p.name"></option>
+            </template>
+          </select>
+        </div>
+      </template>
+    </div>
+    <div class="flex gap-2 mb-2">
+      <button @click="presetSetAll()" class="text-xs text-blue-600 hover:underline">Alle gleich setzen…</button>
+    </div>
+    <div x-show="presetMsg" class="text-sm mb-3"
+      :class="presetMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'" x-text="presetMsg"></div>
+    <div class="flex gap-2 pt-3 border-t">
+      <button @click="submitPreset()"
+        class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">Speichern</button>
+      <button @click="showPresetModal=false"
+        class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preset Set-All Helper Modal -->
+<div x-show="showPresetSetAll" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" @click.self="showPresetSetAll=false">
+  <div class="bg-white rounded-xl shadow-xl p-5 w-full max-w-xs mx-4">
+    <h3 class="font-semibold mb-3">Alle Geräte auf Profil setzen</h3>
+    <select x-model="presetSetAllProfile" class="w-full border rounded px-2 py-1.5 text-sm mb-4">
+      <option value="">Profil auswählen…</option>
+      <template x-for="p in profiles" :key="p.name">
+        <option :value="p.name" x-text="p.name"></option>
+      </template>
+    </select>
+    <div class="flex gap-2">
+      <button @click="confirmPresetSetAll()"
+        class="flex-1 bg-blue-600 text-white rounded px-3 py-1.5 text-sm hover:bg-blue-700">Übernehmen</button>
+      <button @click="showPresetSetAll=false"
+        class="flex-1 bg-gray-100 rounded px-3 py-1.5 text-sm hover:bg-gray-200">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -1043,12 +1205,24 @@ function app() {
     // Profile modal
     showProfileModal: false,
     profileEditMode: false,
-    profileForm: {name: '', comfort_temp: '', eco_temp: ''},
+    profileForm: {name: '', comfort_temp: '', eco_temp: '', child_lock: null},
     profileScheduleForm: [],
     profileWeekPeriods: [],
     profileWeekendPeriods: [],
     profileSchedTab: 'week',
     profileMsg: '',
+
+    presets: [],
+    showPresetModal: false,
+    presetEditId: null,
+    presetForm: {name: '', assignments: {}},
+    presetMsg: '',
+    presetApplying: null,
+    presetResults: {},
+    presetProgress: {},
+    showPresetSetAll: false,
+    presetSetAllProfile: '',
+    childLockBusy: false,
 
     pollingDevices: {},
     pollingAll: false,
@@ -1070,6 +1244,7 @@ function app() {
       }
       await this.loadDevices();
       await this.loadProfiles();
+      await this.loadPresets();
       await this.loadStatus();
       setInterval(() => this.loadDevices(), 30000);
     },
@@ -1077,6 +1252,7 @@ function app() {
     onPageChange(tab) {
       if (tab === 'discovery') this.loadKnownDevices();
       if (tab === 'monitor')   this.loadMonitor();
+      if (tab === 'szenen')    this.loadPresets();
     },
 
     async loadDevices() {
@@ -1121,6 +1297,148 @@ function app() {
         if (data) full.push(data);
       }
       this.profiles = full;
+    },
+
+    async loadPresets() {
+      this.presets = await fetch(`${API}/api/presets`).then(r => r.json()).catch(() => []);
+    },
+
+    openNewPreset() {
+      this.presetEditId = null;
+      this.presetMsg = '';
+      // Default: all devices unassigned
+      const assignments = {};
+      this.devices.forEach(d => { assignments[d.address] = ''; });
+      this.presetForm = {name: '', assignments};
+      this.showPresetModal = true;
+    },
+
+    openEditPreset(preset) {
+      this.presetEditId = preset.id;
+      this.presetMsg = '';
+      // Fill in any devices not in stored assignments
+      const assignments = {};
+      this.devices.forEach(d => { assignments[d.address] = preset.assignments[d.address] || ''; });
+      this.presetForm = {name: preset.name, assignments};
+      this.showPresetModal = true;
+    },
+
+    presetSetAll() {
+      this.presetSetAllProfile = '';
+      this.showPresetSetAll = true;
+    },
+
+    confirmPresetSetAll() {
+      if (!this.presetSetAllProfile) return;
+      this.devices.forEach(d => { this.presetForm.assignments[d.address] = this.presetSetAllProfile; });
+      this.showPresetSetAll = false;
+    },
+
+    async submitPreset() {
+      this.presetMsg = '';
+      if (!this.presetForm.name.trim()) { this.presetMsg = 'Name darf nicht leer sein.'; return; }
+      // Only save non-empty assignments
+      const assignments = {};
+      Object.entries(this.presetForm.assignments).forEach(([addr, prof]) => { if (prof) assignments[addr] = prof; });
+      const body = {name: this.presetForm.name.trim(), assignments};
+      const res = await fetch(
+        this.presetEditId ? `${API}/api/presets/${this.presetEditId}` : `${API}/api/presets`,
+        {method: this.presetEditId ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}
+      ).catch(() => null);
+      if (!res?.ok) {
+        const err = await res?.json().catch(() => ({}));
+        this.presetMsg = 'Fehler: ' + (err?.detail || 'Unbekannt');
+        return;
+      }
+      await this.loadPresets();
+      this.showPresetModal = false;
+      this.showToast(this.presetEditId ? 'Szene gespeichert.' : 'Szene erstellt.');
+    },
+
+    async deletePreset(id) {
+      if (!confirm('Szene löschen?')) return;
+      await fetch(`${API}/api/presets/${id}`, {method: 'DELETE'});
+      await this.loadPresets();
+      this.showToast('Szene gelöscht.');
+    },
+
+    async toggleChildLock(dev) {
+      const enabled = !dev.status?.child_lock;
+      this._bleLock('Kindersicherung wird gesetzt…', dev.address);
+      const res = await fetch(`${API}/api/devices/${dev.address}/flags`, {
+        method: 'PATCH', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({child_lock: enabled}),
+      }).catch(() => null);
+      this._bleUnlock(dev.address);
+      if (res?.ok) {
+        // Optimistically update cached status
+        const d = this.devices.find(d => d.address === dev.address);
+        if (d?.status) d.status.child_lock = enabled ? 1 : 0;
+        this.showToast(`Kindersicherung ${enabled ? 'aktiviert' : 'deaktiviert'}: ${dev.name || dev.address.substring(0,8)}`);
+      } else {
+        this.showToast('Fehler beim Setzen der Kindersicherung.');
+      }
+    },
+
+    async setChildLockAll(enabled) {
+      if (!confirm(`Kindersicherung für alle Geräte ${enabled ? 'aktivieren' : 'deaktivieren'}?`)) return;
+      this.childLockBusy = true;
+      const res = await fetch(`${API}/api/devices/set-child-lock`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled, addresses: ['all']}),
+      }).catch(() => null);
+      this.childLockBusy = false;
+      if (res?.ok) {
+        await this.loadDevices();
+        this.showToast(`Kindersicherung ${enabled ? 'aktiviert' : 'deaktiviert'} für alle Geräte.`);
+      } else {
+        this.showToast('Fehler beim Setzen der Kindersicherung.');
+      }
+    },
+
+    async applyPreset(preset) {
+      this.presetApplying = preset.id;
+      this.presetResults = {...this.presetResults, [preset.id]: {}};
+      this.presetProgress = {...this.presetProgress, [preset.id]: {done: 0, total: 0}};
+
+      const res = await fetch(`${API}/api/presets/${preset.id}/apply`, {method: 'POST'}).catch(() => null);
+      if (!res?.ok) { this.presetApplying = null; this.showToast('Fehler beim Anwenden.'); return; }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const {value, done} = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, {stream: true});
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        let event = '', data = '';
+        for (const line of lines) {
+          if (line.startsWith('event:')) event = line.slice(6).trim();
+          else if (line.startsWith('data:')) data = line.slice(5).trim();
+          else if (line === '' && data) {
+            try {
+              const payload = JSON.parse(data);
+              if (event === 'progress') {
+                this.presetProgress = {...this.presetProgress, [preset.id]: {done: payload.index, total: payload.total}};
+                this.presetResults[preset.id] = {...this.presetResults[preset.id], [payload.address]: 'applying'};
+              } else if (event === 'result') {
+                this.presetResults[preset.id] = {...this.presetResults[preset.id], [payload.address]: payload.status};
+                const prog = this.presetProgress[preset.id];
+                this.presetProgress = {...this.presetProgress, [preset.id]: {...prog, done: (prog?.done || 0) + 1}};
+              } else if (event === 'done') {
+                this.presetProgress = {...this.presetProgress, [preset.id]: {done: payload.results ? Object.keys(payload.results).length : 0, total: payload.results ? Object.keys(payload.results).length : 0}};
+              }
+            } catch {}
+            event = ''; data = '';
+          }
+        }
+      }
+
+      this.presetApplying = null;
+      await this.loadDevices();
+      this.showToast(`Szene "${preset.name}" angewendet.`);
     },
 
     async loadStatus() {
@@ -1653,7 +1971,7 @@ function app() {
 
     openNewProfile() {
       this.profileEditMode = false;
-      this.profileForm = {name: '', comfort_temp: '', eco_temp: ''};
+      this.profileForm = {name: '', comfort_temp: '', eco_temp: '', child_lock: null};
       this.profileScheduleForm = this._emptyProfileScheduleForm();
       this.profileWeekPeriods = this._emptyPeriods();
       this.profileWeekendPeriods = this._emptyPeriods();
@@ -1668,6 +1986,7 @@ function app() {
         name: p.name,
         comfort_temp: p.comfort_temp ?? '',
         eco_temp:     p.eco_temp     ?? '',
+        child_lock:   p.child_lock   ?? null,
       };
       this.profileScheduleForm = this._emptyProfileScheduleForm();
       if (p.schedules) {
@@ -1690,6 +2009,7 @@ function app() {
       const body = {name};
       if (this.profileForm.comfort_temp !== '') body.comfort_temp = parseFloat(this.profileForm.comfort_temp);
       if (this.profileForm.eco_temp     !== '') body.eco_temp     = parseFloat(this.profileForm.eco_temp);
+      if (this.profileForm.child_lock   !== null) body.child_lock = this.profileForm.child_lock;
       // If week or weekend tab is active, apply shortcut data to individual form first
       if (this.profileSchedTab === 'week') this.applyWeekToSchedule();
       else if (this.profileSchedTab === 'weekend') this.applyWeekendToSchedule();

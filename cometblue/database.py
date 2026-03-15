@@ -90,6 +90,12 @@ async def init_db(path: Optional[Path] = None):
             );
 
             INSERT OR IGNORE INTO settings (key, value) VALUES ('auto_poll', 'true');
+
+            CREATE TABLE IF NOT EXISTS presets (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT NOT NULL UNIQUE,
+                assignments TEXT NOT NULL DEFAULT '{}'
+            );
         """)
         await db.commit()
     log.info("Database ready at %s", db_path)
@@ -319,6 +325,51 @@ async def get_status(address: str) -> Optional[dict]:
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+# ── Presets (scenes) ──────────────────────────────────────────────────────────
+
+async def list_presets() -> list[dict]:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM presets ORDER BY name") as cur:
+            rows = await cur.fetchall()
+            return [{"id": r["id"], "name": r["name"], "assignments": json.loads(r["assignments"])} for r in rows]
+
+
+async def get_preset(preset_id: int) -> Optional[dict]:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM presets WHERE id = ?", (preset_id,)) as cur:
+            row = await cur.fetchone()
+            if not row:
+                return None
+            return {"id": row["id"], "name": row["name"], "assignments": json.loads(row["assignments"])}
+
+
+async def create_preset(name: str, assignments: dict) -> dict:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO presets (name, assignments) VALUES (?, ?)",
+            (name, json.dumps(assignments)),
+        )
+        await db.commit()
+        return await get_preset(cur.lastrowid)
+
+
+async def update_preset(preset_id: int, name: str, assignments: dict):
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(
+            "UPDATE presets SET name = ?, assignments = ? WHERE id = ?",
+            (name, json.dumps(assignments), preset_id),
+        )
+        await db.commit()
+
+
+async def delete_preset(preset_id: int):
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute("DELETE FROM presets WHERE id = ?", (preset_id,))
+        await db.commit()
 
 
 async def get_setting(key: str, default: str = "") -> str:

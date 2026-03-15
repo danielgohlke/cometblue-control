@@ -122,6 +122,11 @@ async def apply_profile(
                     offset=cached_offset,
                 )
 
+                # Apply child lock if defined in profile
+                child_lock = profile.get("child_lock")
+                if child_lock is not None:
+                    await dev.set_child_lock(bool(child_lock))
+
                 # Apply weekly schedules if requested
                 if apply_schedules and "schedules" in profile:
                     schedules = profile_to_schedules(profile)

@@ -1,25 +1,40 @@
+child_lock: true
+comfort_temp: 19
+eco_temp: 18
 name: Spring
-comfort_temp: 19.0
-eco_temp: 18.0
 schedules:
-  monday:
-    - {start: "07:00", end: "12:00"}
-    - {start: "12:10", end: "19:00"}
-  tuesday:
-    - {start: "07:00", end: "12:00"}
-    - {start: "12:10", end: "19:00"}
-  wednesday:
-    - {start: "07:00", end: "12:00"}
-    - {start: "12:10", end: "19:00"}
-  thursday:
-    - {start: "07:00", end: "12:00"}
-    - {start: "12:10", end: "19:00"}
   friday:
-    - {start: "07:00", end: "12:00"}
-    - {start: "12:10", end: "19:00"}
+  - end: '12:00'
+    start: 07:00
+  - end: '19:00'
+    start: '12:10'
+  monday:
+  - end: '12:00'
+    start: 07:00
+  - end: '19:00'
+    start: '12:10'
   saturday:
-    - {start: "07:00", end: "12:00"}
-    - {start: "12:10", end: "19:00"}
+  - end: '12:00'
+    start: 07:00
+  - end: '19:00'
+    start: '12:10'
   sunday:
-    - {start: "07:00", end: "12:00"}
-    - {start: "12:10", end: "19:00"}
+  - end: '12:00'
+    start: 07:00
+  - end: '19:00'
+    start: '12:10'
+  thursday:
+  - end: '12:00'
+    start: 07:00
+  - end: '19:00'
+    start: '12:10'
+  tuesday:
+  - end: '12:00'
+    start: 07:00
+  - end: '19:00'
+    start: '12:10'
+  wednesday:
+  - end: '12:00'
+    start: 07:00
+  - end: '19:00'
+    start: '12:10'
