@@ -2558,10 +2558,9 @@ function app() {
       if (this.pollingAll) return;
       this.pollingAll = true;
       try {
-        await Promise.all(this.devices.map(d =>
-          fetch(`${API}/api/devices/${d.address}/poll`, {method: 'POST'}).catch(() => null)
-        ));
-        await this.loadDevices();
+        // Fire-and-forget: server polls all devices in background, returns immediately.
+        // Results arrive via the 30s auto-refresh.
+        await fetch(`${API}/api/devices/poll-all`, {method: 'POST'}).catch(() => null);
         this.showToast(this.t('toast_poll_all_done'));
       } finally {
         this.pollingAll = false;

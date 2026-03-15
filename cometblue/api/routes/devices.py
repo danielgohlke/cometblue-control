@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -220,6 +221,13 @@ async def rediscover_device(address: str):
 
     await db.update_device_address(old_address, new_address)
     return {"status": "updated", "old_address": old_address, "new_address": new_address, "mac": mac}
+
+
+@router.post("/poll-all", status_code=202)
+async def poll_all_devices():
+    """Trigger a background poll of all devices. Returns immediately."""
+    asyncio.create_task(trigger_poll_now())
+    return {"status": "triggered"}
 
 
 @router.post("/{address}/poll")
