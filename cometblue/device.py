@@ -26,11 +26,48 @@ from .protocol import (
 
 log = logging.getLogger(__name__)
 
-CONNECT_TIMEOUT = 15.0
+CONNECT_TIMEOUT = 45.0  # Pi 3B+ GATT service discovery can take 30+ seconds
 OP_TIMEOUT = 10.0
 
 # BlueZ only supports one BLE operation at a time — serialize all connections
 _ble_lock = asyncio.Semaphore(1)
+
+
+async def _reset_ble_adapter(address: Optional[str] = None):
+    """Recover from a D-Bus EOFError after a failed BLE disconnect.
+
+    On Linux/BlueZ with dbus-fast 4.x the D-Bus socket can close mid-operation,
+    leaving BlueZ with a stale 'connected' entry for the device and bleak's
+    BlueZManager dead.  This function:
+      1. Forces a BlueZ-level disconnect via bluetoothctl (removes stale state)
+      2. Clears bleak's per-loop BlueZManager cache (forces fresh D-Bus conn)
+      3. Waits for BlueZ to stabilize before the next connection attempt
+    """
+    # Step 1: disconnect from BlueZ's side so the adapter is released
+    if address:
+        try:
+            addr_clean = address.upper()
+            proc = await asyncio.create_subprocess_exec(
+                "bluetoothctl", "disconnect", addr_clean,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(proc.wait(), timeout=5.0)
+            log.info("bluetoothctl disconnect %s complete", addr_clean)
+        except Exception as e:
+            log.debug("bluetoothctl disconnect failed (non-fatal): %s", e)
+
+    # Step 2: clear bleak's dead manager so next call creates a fresh one
+    try:
+        from bleak.backends.bluezdbus import manager as _bleak_mgr_mod
+        loop = asyncio.get_running_loop()
+        _bleak_mgr_mod._global_instances.pop(loop, None)
+        log.info("BlueZManager cache cleared after EOFError")
+    except Exception as e:
+        log.warning("Could not clear BlueZManager cache: %s", e)
+
+    # Step 3: give BlueZ time to re-initialize D-Bus connection
+    await asyncio.sleep(5.0)
 
 
 class CometBlueDevice:
@@ -52,7 +89,10 @@ class CometBlueDevice:
             kwargs["adapter"] = self._adapter
         try:
             self._client = BleakClient(self.address, **kwargs)
-            await self._client.connect()
+            # Use cached GATT services if BlueZ already knows the device.
+            # On Pi 3B+, fresh service discovery takes ~30s which can exceed
+            # the CometBlue device's unauthenticated-connection timeout.
+            await self._client.connect(dangerous_use_bleak_cache=True)
         except BleakError as e:
             # Device not found + we have a stored MAC → try to resolve new UUID (e.g. after battery swap)
             if self._mac_address and "not found" in str(e).lower():
@@ -69,7 +109,7 @@ class CometBlueDevice:
                     )
                     self.address = found.address
                     self._client = BleakClient(self.address, **kwargs)
-                    await self._client.connect()
+                    await self._client.connect(dangerous_use_bleak_cache=True)
                 else:
                     raise
             else:
@@ -82,6 +122,13 @@ class CometBlueDevice:
         try:
             if self._client and self._client.is_connected:
                 await self._client.disconnect()
+        except EOFError:
+            # dbus-fast D-Bus socket closed unexpectedly (known issue on Pi 3B+
+            # with bleak 2.x / dbus-fast 4.x). From BlueZ's perspective the
+            # device may still appear connected. Reset the BLE subsystem so the
+            # next connection attempt succeeds.
+            log.warning("EOFError on BLE disconnect for %s — resetting BLE subsystem", self.address)
+            await _reset_ble_adapter(self.address)
         finally:
             _ble_lock.release()
 
@@ -332,24 +379,12 @@ _AUTH_KEYWORDS = (
 async def poll_device(address: str, pin: Optional[int] = None, adapter: Optional[str] = None,
                       mac_address: Optional[str] = None) -> dict:
     """Standalone helper: connect, poll, disconnect."""
-    # Quick advertisement scan to capture current RSSI before connecting
-    rssi = None
-    try:
-        scan_kwargs: dict = {"timeout": 3.0}
-        if adapter:
-            scan_kwargs["adapter"] = adapter
-        found = await BleakScanner.find_device_by_address(address, **scan_kwargs)
-        if found:
-            rssi = getattr(found, "rssi", None)
-    except Exception:
-        pass
-
+    # Note: no pre-scan for RSSI here — on Linux/BlueZ running a BleakScanner
+    # scan immediately before connecting corrupts adapter state and causes
+    # TimeoutError on the connection. RSSI is updated via the discovery endpoint.
     try:
         async with CometBlueDevice(address, pin=pin, adapter=adapter, mac_address=mac_address) as dev:
-            result = await dev.poll_status()
-            if rssi is not None:
-                result["rssi"] = rssi
-            return result
+            return await dev.poll_status()
     except BleakError as e:
         err_str = str(e) or type(e).__name__
         is_auth = any(kw in err_str.lower() for kw in _AUTH_KEYWORDS)
