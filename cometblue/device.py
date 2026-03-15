@@ -29,6 +29,9 @@ log = logging.getLogger(__name__)
 CONNECT_TIMEOUT = 15.0
 OP_TIMEOUT = 10.0
 
+# BlueZ only supports one BLE operation at a time — serialize all connections
+_ble_lock = asyncio.Semaphore(1)
+
 
 class CometBlueDevice:
     """Async context manager for communicating with a CometBlue thermostat."""
@@ -43,6 +46,7 @@ class CometBlueDevice:
         self._client: Optional[BleakClient] = None
 
     async def __aenter__(self) -> "CometBlueDevice":
+        await _ble_lock.acquire()
         kwargs = {"timeout": CONNECT_TIMEOUT}
         if self._adapter:
             kwargs["adapter"] = self._adapter
@@ -75,8 +79,11 @@ class CometBlueDevice:
         return self
 
     async def __aexit__(self, *args):
-        if self._client and self._client.is_connected:
-            await self._client.disconnect()
+        try:
+            if self._client and self._client.is_connected:
+                await self._client.disconnect()
+        finally:
+            _ble_lock.release()
 
     async def _authenticate(self):
         data = encode_pin(self.pin)

@@ -510,6 +510,37 @@ What the playbook does:
 ssh drg@raspberry.local "journalctl -u cometblue -f"
 ```
 
+### Service logs
+
+```bash
+# Live-Log (follow)
+journalctl -u cometblue -f
+
+# Last 100 lines
+journalctl -u cometblue -n 100
+
+# Since today
+journalctl -u cometblue --since today
+
+# Filter errors only
+journalctl -u cometblue -p err
+```
+
+### Log level
+
+Edit `~/.cometblue/config.yaml` on the Pi:
+
+```yaml
+log_level: "WARNING"   # errors + warnings only (quieter)
+log_level: "INFO"      # normal (default)
+log_level: "DEBUG"     # verbose — all BLE operations
+```
+
+Then restart the service:
+```bash
+sudo systemctl restart cometblue
+```
+
 ### Bluetooth permissions on Linux
 
 If you get permission errors with Bluetooth:
