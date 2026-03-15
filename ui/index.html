@@ -443,7 +443,7 @@
             </template>
           </div>
           <!-- Terminal log + progress bar -->
-          <div x-show="presetLogId === preset.id && presetLog.length > 0" class="mb-3">
+          <div x-show="presetLog.length > 0 && (presetApplying == preset.id || presetLogId == preset.id)" class="mb-3">
             <div class="bg-gray-900 rounded-lg px-3 py-2 font-mono text-xs max-h-28 overflow-y-auto space-y-0.5"
               id="presetLogEl">
               <template x-for="(line, i) in presetLog" :key="i">
@@ -1475,30 +1475,30 @@ function app() {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let buf = '';
+      let buf = '', event = '', data = '';
+      const pid = preset.id;
       while (true) {
         const {value, done} = await reader.read();
         if (done) break;
         buf += decoder.decode(value, {stream: true});
-        const lines = buf.split('\n');
+        const lines = buf.split(/\r?\n/);
         buf = lines.pop();
-        let event = '', data = '';
         for (const line of lines) {
-          if (line.startsWith('event:')) event = line.slice(6).trim();
-          else if (line.startsWith('data:')) data = line.slice(5).trim();
-          else if (line === '' && data) {
+          if (line.startsWith('event:')) { event = line.slice(6).trim(); }
+          else if (line.startsWith('data:')) { data = line.slice(5).trim(); }
+          else if (line.trim() === '' && event && data) {
             try {
               const payload = JSON.parse(data);
               if (event === 'progress') {
-                this.presetProgress = {...this.presetProgress, [preset.id]: {done: payload.index, total: payload.total}};
-                this.presetResults[preset.id] = {...this.presetResults[preset.id], [payload.address]: 'applying'};
+                this.presetProgress = {...this.presetProgress, [pid]: {done: payload.index, total: payload.total}};
+                this.presetResults = {...this.presetResults, [pid]: {...(this.presetResults[pid] || {}), [payload.address]: 'applying'}};
                 const devName = this.devices.find(d => d.address === payload.address)?.name || payload.address.substring(0,8);
                 this.presetLog = [...this.presetLog, {text: `→ Wird angewendet: ${devName} (${payload.profile})…`, type: 'info'}];
                 this._scrollPresetLog();
               } else if (event === 'result') {
-                this.presetResults[preset.id] = {...this.presetResults[preset.id], [payload.address]: payload.status};
-                const prog = this.presetProgress[preset.id];
-                this.presetProgress = {...this.presetProgress, [preset.id]: {...prog, done: (prog?.done || 0) + 1}};
+                const prog = this.presetProgress[pid] || {};
+                this.presetProgress = {...this.presetProgress, [pid]: {...prog, done: (prog.done || 0) + 1}};
+                this.presetResults = {...this.presetResults, [pid]: {...(this.presetResults[pid] || {}), [payload.address]: payload.status}};
                 const devName = this.devices.find(d => d.address === payload.address)?.name || payload.address.substring(0,8);
                 const resultLine = payload.status === 'ok'
                   ? {text: `✓ ${devName}`, type: 'ok'}
@@ -1509,9 +1509,9 @@ function app() {
                 this._scrollPresetLog();
               } else if (event === 'done') {
                 const total = payload.results ? Object.keys(payload.results).length : 0;
-                this.presetProgress = {...this.presetProgress, [preset.id]: {done: total, total}};
+                this.presetProgress = {...this.presetProgress, [pid]: {done: total, total}};
               }
-            } catch {}
+            } catch(e) { console.warn('SSE parse error', e, {event, data}); }
             event = ''; data = '';
           }
         }
@@ -2153,25 +2153,24 @@ function app() {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let buf = '';
+      let buf = '', event = '', data = '';
       while (true) {
         const {value, done} = await reader.read();
         if (done) break;
         buf += decoder.decode(value, {stream: true});
-        const lines = buf.split('\n');
+        const lines = buf.split(/\r?\n/);
         buf = lines.pop();
-        let event = '', data = '';
         for (const line of lines) {
-          if (line.startsWith('event:')) event = line.slice(6).trim();
-          else if (line.startsWith('data:')) data = line.slice(5).trim();
-          else if (line === '' && data) {
+          if (line.startsWith('event:')) { event = line.slice(6).trim(); }
+          else if (line.startsWith('data:')) { data = line.slice(5).trim(); }
+          else if (line.trim() === '' && event && data) {
             try {
               const payload = JSON.parse(data);
               if (event === 'progress') {
                 this.applyProfileResults = {...this.applyProfileResults, [payload.address]: 'applying'};
                 const devName = this.devices.find(d => d.address === payload.address)?.name || payload.address.substring(0,8);
                 this.applyProfileLog = [...this.applyProfileLog, {text: `→ Wird angewendet: ${devName}…`, type: 'info'}];
-                this.$nextTick(() => { const el = document.getElementById('applyProfileLogEl'); if (el) el.scrollTop = el.scrollHeight; });
+                setTimeout(() => { const el = document.getElementById('applyProfileLogEl'); if (el) el.scrollTop = el.scrollHeight; }, 0);
               } else if (event === 'result') {
                 this.applyProfileResults = {...this.applyProfileResults, [payload.address]: payload.status};
                 this.applyProfileProgress = {...this.applyProfileProgress, done: this.applyProfileProgress.done + 1};
@@ -2182,9 +2181,9 @@ function app() {
                   : {text: `✗ ${devName}: ${payload.status}`, type: 'error'};
                 if (log.length > 0) log[log.length - 1] = resultLine; else log.push(resultLine);
                 this.applyProfileLog = log;
-                this.$nextTick(() => { const el = document.getElementById('applyProfileLogEl'); if (el) el.scrollTop = el.scrollHeight; });
+                setTimeout(() => { const el = document.getElementById('applyProfileLogEl'); if (el) el.scrollTop = el.scrollHeight; }, 0);
               }
-            } catch {}
+            } catch(e) { console.warn('SSE parse error', e, {event, data}); }
             event = ''; data = '';
           }
         }
