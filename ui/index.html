@@ -443,10 +443,10 @@
             </template>
           </div>
           <!-- Terminal log + progress bar -->
-          <div x-show="(presetLog[preset.id] || []).length > 0" class="mb-3">
+          <div x-show="presetLogId === preset.id && presetLog.length > 0" class="mb-3">
             <div class="bg-gray-900 rounded-lg px-3 py-2 font-mono text-xs max-h-28 overflow-y-auto space-y-0.5"
-              :data-preset-log="preset.id">
-              <template x-for="(line, i) in (presetLog[preset.id] || [])" :key="i">
+              id="presetLogEl">
+              <template x-for="(line, i) in presetLog" :key="i">
                 <div :class="line.type === 'ok' ? 'text-green-400' : line.type === 'error' ? 'text-red-400' : 'text-blue-300'"
                   x-text="line.text"></div>
               </template>
@@ -1278,7 +1278,8 @@ function app() {
     presetApplying: null,
     presetResults: {},
     presetProgress: {},
-    presetLog: {},
+    presetLog: [],
+    presetLogId: null,
     showPresetSetAll: false,
     presetSetAllProfile: '',
     childLockBusy: false,
@@ -1458,32 +1459,16 @@ function app() {
       }
     },
 
-    _pushPresetLog(id, line) {
-      const log = [...(this.presetLog[id] || [])];
-      log.push(line);
-      this.presetLog = {...this.presetLog, [id]: log};
-      this.$nextTick(() => {
-        const el = document.querySelector(`[data-preset-log="${id}"]`);
-        if (el) el.scrollTop = el.scrollHeight;
-      });
-    },
-
-    _replaceLastPresetLog(id, line) {
-      const log = [...(this.presetLog[id] || [])];
-      if (log.length > 0) log[log.length - 1] = line;
-      else log.push(line);
-      this.presetLog = {...this.presetLog, [id]: log};
-      this.$nextTick(() => {
-        const el = document.querySelector(`[data-preset-log="${id}"]`);
-        if (el) el.scrollTop = el.scrollHeight;
-      });
+    _scrollPresetLog() {
+      setTimeout(() => { const el = document.getElementById('presetLogEl'); if (el) el.scrollTop = el.scrollHeight; }, 0);
     },
 
     async applyPreset(preset) {
       this.presetApplying = preset.id;
+      this.presetLogId = preset.id;
+      this.presetLog = [];
       this.presetResults = {...this.presetResults, [preset.id]: {}};
       this.presetProgress = {...this.presetProgress, [preset.id]: {done: 0, total: 0}};
-      this.presetLog = {...this.presetLog, [preset.id]: []};
 
       const res = await fetch(`${API}/api/presets/${preset.id}/apply`, {method: 'POST'}).catch(() => null);
       if (!res?.ok) { this.presetApplying = null; this.showToast('Fehler beim Anwenden.'); return; }
@@ -1508,17 +1493,20 @@ function app() {
                 this.presetProgress = {...this.presetProgress, [preset.id]: {done: payload.index, total: payload.total}};
                 this.presetResults[preset.id] = {...this.presetResults[preset.id], [payload.address]: 'applying'};
                 const devName = this.devices.find(d => d.address === payload.address)?.name || payload.address.substring(0,8);
-                this._pushPresetLog(preset.id, {text: `→ Wird angewendet: ${devName} (${payload.profile})…`, type: 'info'});
+                this.presetLog = [...this.presetLog, {text: `→ Wird angewendet: ${devName} (${payload.profile})…`, type: 'info'}];
+                this._scrollPresetLog();
               } else if (event === 'result') {
                 this.presetResults[preset.id] = {...this.presetResults[preset.id], [payload.address]: payload.status};
                 const prog = this.presetProgress[preset.id];
                 this.presetProgress = {...this.presetProgress, [preset.id]: {...prog, done: (prog?.done || 0) + 1}};
                 const devName = this.devices.find(d => d.address === payload.address)?.name || payload.address.substring(0,8);
-                if (payload.status === 'ok') {
-                  this._replaceLastPresetLog(preset.id, {text: `✓ ${devName}`, type: 'ok'});
-                } else {
-                  this._replaceLastPresetLog(preset.id, {text: `✗ ${devName}: ${payload.status}`, type: 'error'});
-                }
+                const resultLine = payload.status === 'ok'
+                  ? {text: `✓ ${devName}`, type: 'ok'}
+                  : {text: `✗ ${devName}: ${payload.status}`, type: 'error'};
+                const log = [...this.presetLog];
+                if (log.length > 0) log[log.length - 1] = resultLine; else log.push(resultLine);
+                this.presetLog = log;
+                this._scrollPresetLog();
               } else if (event === 'done') {
                 const total = payload.results ? Object.keys(payload.results).length : 0;
                 this.presetProgress = {...this.presetProgress, [preset.id]: {done: total, total}};
