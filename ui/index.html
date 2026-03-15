@@ -444,10 +444,10 @@
           </div>
           <!-- Terminal log + progress bar -->
           <div x-show="presetLog.length > 0 && (presetApplying == preset.id || presetLogId == preset.id)" class="mb-3">
-            <div class="bg-gray-900 rounded-lg px-3 py-2 font-mono text-xs max-h-28 overflow-y-auto space-y-0.5"
+            <div class="bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs max-h-28 overflow-y-auto space-y-0.5"
               id="presetLogEl">
               <template x-for="(line, i) in presetLog" :key="i">
-                <div :class="line.type === 'ok' ? 'text-green-400' : line.type === 'error' ? 'text-red-400' : 'text-blue-300'"
+                <div :class="line.type === 'ok' ? 'text-green-600' : line.type === 'error' ? 'text-red-500' : 'text-blue-500'"
                   x-text="line.text"></div>
               </template>
             </div>
@@ -1050,10 +1050,10 @@
 
     <!-- Terminal log + progress bar -->
     <div x-show="applyProfileLog.length > 0" class="mb-3">
-      <div class="bg-gray-900 rounded-lg px-3 py-2 font-mono text-xs max-h-28 overflow-y-auto space-y-0.5"
+      <div class="bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs max-h-28 overflow-y-auto space-y-0.5"
         id="applyProfileLogEl">
         <template x-for="(line, i) in applyProfileLog" :key="i">
-          <div :class="line.type === 'ok' ? 'text-green-400' : line.type === 'error' ? 'text-red-400' : 'text-blue-300'"
+          <div :class="line.type === 'ok' ? 'text-green-600' : line.type === 'error' ? 'text-red-500' : 'text-blue-500'"
             x-text="line.text"></div>
         </template>
       </div>
