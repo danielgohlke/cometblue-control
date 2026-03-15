@@ -3,8 +3,10 @@
 host: "0.0.0.0"
 port: 8080
 
-# Polling interval in seconds (default: every 5 minutes)
-poll_interval: 300
+# Polling interval in seconds
+# Note: on Raspberry Pi 3B+, each device takes ~45s (slow GATT service discovery).
+# With 7 devices allow at least 7 * 50s = 350s between polls.
+poll_interval: 600
 
 bluetooth:
   # Bluetooth adapter (null = system default, e.g. "hci0" on Linux)
