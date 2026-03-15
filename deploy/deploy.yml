@@ -1,0 +1,172 @@
+---
+# CometBlue Control — Ansible Deploy Playbook
+# Erstes Deploy:  ansible-playbook -i deploy/inventory.ini deploy/deploy.yml
+# Update:         ansible-playbook -i deploy/inventory.ini deploy/deploy.yml --tags update
+
+- name: Deploy CometBlue Control
+  hosts: cometblue
+  become: true
+
+  vars:
+    install_dir: /opt/cometblue-control
+    service_user: "{{ ansible_user }}"
+    config_dir: "/home/{{ ansible_user }}/.cometblue"
+    port: 8080
+
+  tasks:
+
+    # ── System-Pakete ──────────────────────────────────────────────
+    - name: System-Pakete installieren
+      apt:
+        name:
+          - python3
+          - python3-venv
+          - python3-pip
+          - git
+          - bluetooth
+          - bluez
+        state: present
+        update_cache: true
+      tags: [setup]
+
+    - name: Bluetooth-Service aktivieren
+      systemd:
+        name: bluetooth
+        enabled: true
+        state: started
+      tags: [setup]
+
+    - name: User zur bluetooth-Gruppe hinzufügen
+      user:
+        name: "{{ service_user }}"
+        groups: bluetooth
+        append: true
+      tags: [setup]
+
+    # ── Code deployen ──────────────────────────────────────────────
+    - name: Install-Verzeichnis anlegen
+      file:
+        path: "{{ install_dir }}"
+        state: directory
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        mode: "0755"
+      tags: [setup, update]
+
+    - name: Code synchronisieren (rsync)
+      synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ install_dir }}/"
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=.venv"
+          - "--exclude=__pycache__"
+          - "--exclude=*.egg-info"
+          - "--exclude=_reference"
+          - "--exclude=deploy"
+          - "--delete"
+      become: false
+      tags: [update]
+
+    - name: Eigentümer setzen
+      file:
+        path: "{{ install_dir }}"
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        recurse: true
+      tags: [update]
+
+    # ── Python-Umgebung ────────────────────────────────────────────
+    - name: Virtual environment erstellen
+      command: python3 -m venv {{ install_dir }}/.venv
+      args:
+        creates: "{{ install_dir }}/.venv/bin/activate"
+      become_user: "{{ service_user }}"
+      tags: [setup]
+
+    - name: Python-Pakete installieren / aktualisieren
+      pip:
+        name: "{{ install_dir }}"
+        extra_args: "-e"
+        virtualenv: "{{ install_dir }}/.venv"
+        virtualenv_command: python3 -m venv
+      become_user: "{{ service_user }}"
+      tags: [setup, update]
+
+    # ── Konfiguration ──────────────────────────────────────────────
+    - name: Config-Verzeichnis anlegen
+      file:
+        path: "{{ config_dir }}/profiles"
+        state: directory
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        mode: "0755"
+      become_user: "{{ service_user }}"
+      tags: [setup]
+
+    - name: Standard-Config kopieren (nur wenn noch nicht vorhanden)
+      copy:
+        src: "{{ install_dir }}/config/config.yaml"
+        dest: "{{ config_dir }}/config.yaml"
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        remote_src: true
+        force: false          # Vorhandene Config nicht überschreiben
+      become_user: "{{ service_user }}"
+      tags: [setup]
+
+    - name: Port in Config setzen
+      lineinfile:
+        path: "{{ config_dir }}/config.yaml"
+        regexp: "^port:"
+        line: "port: {{ port }}"
+      become_user: "{{ service_user }}"
+      tags: [setup]
+
+    - name: Standard-Profile kopieren (nur fehlende)
+      copy:
+        src: "{{ install_dir }}/config/profiles/{{ item }}"
+        dest: "{{ config_dir }}/profiles/{{ item }}"
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        remote_src: true
+        force: false
+      loop:
+        - winter.yaml
+        - summer.yaml
+        - spring.yaml
+        - holiday.yaml
+        - aus.yaml
+        - weekend.yaml
+        - weekday.yaml
+      become_user: "{{ service_user }}"
+      tags: [setup, update]
+
+    # ── systemd-Service ────────────────────────────────────────────
+    - name: systemd-Unit installieren
+      template:
+        src: cometblue.service.j2
+        dest: /etc/systemd/system/cometblue.service
+        mode: "0644"
+      notify: systemd reload
+      tags: [setup, update]
+
+    - name: Service aktivieren und starten
+      systemd:
+        name: cometblue
+        enabled: true
+        state: started
+        daemon_reload: true
+      tags: [setup]
+
+    - name: Service neu starten (nach Update)
+      systemd:
+        name: cometblue
+        state: restarted
+        daemon_reload: true
+      tags: [update]
+
+  handlers:
+    - name: systemd reload
+      systemd:
+        daemon_reload: true
