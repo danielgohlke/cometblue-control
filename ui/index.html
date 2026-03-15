@@ -418,24 +418,27 @@
               </button>
             </div>
           </div>
-          <!-- Assignment overview -->
-          <div class="grid grid-cols-2 gap-x-6 gap-y-1 mb-4">
+          <!-- Assignment overview with live status -->
+          <div class="grid grid-cols-2 gap-x-6 gap-y-0.5 mb-4">
             <template x-for="dev in devices" :key="dev.address">
-              <div class="flex items-center justify-between text-sm py-0.5 border-b border-gray-50">
-                <span class="text-gray-700" x-text="dev.name || dev.address.substring(0,8)"></span>
-                <span class="font-medium"
-                  :class="preset.assignments[dev.address] ? 'text-blue-600' : 'text-gray-300'"
+              <div class="flex items-center gap-2 text-sm py-1 border-b border-gray-50">
+                <!-- Status icon slot -->
+                <span class="w-4 flex-shrink-0 flex items-center justify-center">
+                  <template x-if="presetResults[preset.id]?.[dev.address] === 'applying'">
+                    <span class="spinner inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full"></span>
+                  </template>
+                  <template x-if="presetResults[preset.id]?.[dev.address] === 'ok'">
+                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  </template>
+                  <template x-if="presetResults[preset.id]?.[dev.address] && presetResults[preset.id]?.[dev.address] !== 'ok' && presetResults[preset.id]?.[dev.address] !== 'applying'">
+                    <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </template>
+                </span>
+                <span class="flex-1 text-gray-700 truncate" x-text="dev.name || dev.address.substring(0,8)"
+                  :title="presetResults[preset.id]?.[dev.address] && presetResults[preset.id]?.[dev.address] !== 'ok' && presetResults[preset.id]?.[dev.address] !== 'applying' ? presetResults[preset.id][dev.address] : ''"></span>
+                <span class="font-medium flex-shrink-0"
+                  :class="preset.assignments[dev.address] ? (presetResults[preset.id]?.[dev.address] === 'ok' ? 'text-green-600' : presetResults[preset.id]?.[dev.address] && presetResults[preset.id]?.[dev.address] !== 'applying' ? 'text-red-500' : 'text-blue-600') : 'text-gray-300'"
                   x-text="preset.assignments[dev.address] || '—'"></span>
-              </div>
-            </template>
-          </div>
-          <!-- Per-device live results -->
-          <div x-show="presetResults[preset.id] && Object.keys(presetResults[preset.id]).length > 0" class="text-xs mb-3 space-y-0.5">
-            <template x-for="[addr, res] in Object.entries(presetResults[preset.id] || {})" :key="addr">
-              <div class="flex gap-2 items-center">
-                <span x-show="res === 'applying'" class="spinner inline-block w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full"></span>
-                <span :class="res === 'ok' ? 'text-green-600' : res === 'applying' ? 'text-blue-500' : 'text-red-500'"
-                  x-text="(res === 'ok' ? '✓ ' : res === 'applying' ? '' : '✗ ') + (devices.find(d=>d.address===addr)?.name || addr.substring(0,8)) + (res !== 'ok' && res !== 'applying' ? ': ' + res : '')"></span>
               </div>
             </template>
           </div>
@@ -988,37 +991,74 @@
 </div>
 
 <!-- Apply Profile Modal -->
-<div x-show="showApplyProfile" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showApplyProfile=false">
+<div x-show="showApplyProfile" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="!applyProfileApplying && (showApplyProfile=false)">
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
     <h2 class="text-lg font-bold mb-1">Profil anwenden</h2>
     <p class="text-sm text-gray-500 mb-4">Profil <strong x-text="applyProfileName"></strong> auf folgende Geräte anwenden:</p>
-    <div class="space-y-2 mb-4">
+
+    <!-- Device list with live status -->
+    <div class="space-y-1 mb-3">
       <template x-for="dev in devices" :key="dev.address">
-        <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-2 py-1">
-          <input type="checkbox" :value="dev.address" x-model="applyProfileTargets"
-            class="rounded border-gray-300 text-blue-600">
-          <span class="text-sm font-medium" x-text="dev.name || dev.address"></span>
-          <span class="text-xs text-gray-400 font-mono ml-auto" x-text="dev.address.substring(0,8) + '…'"></span>
-        </label>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded"
+          :class="applyProfileApplying ? 'cursor-default' : 'cursor-pointer hover:bg-gray-50'"
+          @click="if (!applyProfileApplying) { const i = applyProfileTargets.indexOf(dev.address); i >= 0 ? applyProfileTargets.splice(i,1) : applyProfileTargets.push(dev.address); }">
+          <!-- Checkbox (selection phase) or status icon (apply phase) -->
+          <span class="w-5 h-5 flex-shrink-0 flex items-center justify-center">
+            <template x-if="!applyProfileApplying && !applyProfileResults[dev.address]">
+              <input type="checkbox" :checked="applyProfileTargets.includes(dev.address)"
+                @click.stop
+                @change="const i = applyProfileTargets.indexOf(dev.address); i >= 0 ? applyProfileTargets.splice(i,1) : applyProfileTargets.push(dev.address)"
+                class="rounded border-gray-300 text-blue-600 pointer-events-none">
+            </template>
+            <template x-if="applyProfileResults[dev.address] === 'applying'">
+              <span class="spinner inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full"></span>
+            </template>
+            <template x-if="applyProfileResults[dev.address] === 'ok'">
+              <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            </template>
+            <template x-if="applyProfileResults[dev.address] && applyProfileResults[dev.address] !== 'ok' && applyProfileResults[dev.address] !== 'applying'">
+              <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </template>
+          </span>
+          <span class="text-sm font-medium flex-1"
+            :class="applyProfileApplying && !applyProfileTargets.includes(dev.address) ? 'text-gray-300' : ''"
+            x-text="dev.name || dev.address"></span>
+          <!-- Error tooltip or address -->
+          <span class="text-xs ml-auto"
+            :class="applyProfileResults[dev.address] && applyProfileResults[dev.address] !== 'ok' && applyProfileResults[dev.address] !== 'applying' ? 'text-red-400' : 'text-gray-400 font-mono'"
+            :title="applyProfileResults[dev.address] && applyProfileResults[dev.address] !== 'ok' && applyProfileResults[dev.address] !== 'applying' ? applyProfileResults[dev.address] : ''"
+            x-text="applyProfileResults[dev.address] && applyProfileResults[dev.address] !== 'ok' && applyProfileResults[dev.address] !== 'applying' ? 'Fehler' : dev.address.substring(0,8) + '…'"></span>
+        </div>
       </template>
     </div>
-    <div class="flex gap-2 text-xs mb-4">
-      <button @click="applyProfileTargets = devices.map(d => d.address)"
-        class="text-blue-600 hover:underline">Alle auswählen</button>
+
+    <!-- Select all / none (only before apply) -->
+    <div x-show="!applyProfileApplying && !Object.keys(applyProfileResults).length" class="flex gap-2 text-xs mb-3">
+      <button @click="applyProfileTargets = devices.map(d => d.address)" class="text-blue-600 hover:underline">Alle auswählen</button>
       <span class="text-gray-300">|</span>
-      <button @click="applyProfileTargets = []"
-        class="text-gray-500 hover:underline">Keine</button>
+      <button @click="applyProfileTargets = []" class="text-gray-500 hover:underline">Keine</button>
     </div>
-    <div x-show="applyProfileMsg" class="text-sm mb-3"
-      :class="applyProfileMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'"
-      x-text="applyProfileMsg"></div>
+
+    <!-- Progress bar -->
+    <div x-show="applyProfileApplying || (applyProfileProgress.total > 0)" class="mb-3">
+      <div class="flex justify-between text-xs text-gray-500 mb-1">
+        <span x-text="'Gerät ' + applyProfileProgress.done + ' / ' + applyProfileProgress.total"></span>
+        <span x-text="applyProfileProgress.total ? Math.round((applyProfileProgress.done / applyProfileProgress.total) * 100) + '%' : ''"></span>
+      </div>
+      <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+        <div class="progress-bar h-2 bg-blue-500 rounded-full"
+          :style="'width:' + (applyProfileProgress.total ? Math.round((applyProfileProgress.done / applyProfileProgress.total) * 100) : 0) + '%'"></div>
+      </div>
+    </div>
+
     <div class="flex gap-2">
       <button @click="submitApplyProfile()" :disabled="applyProfileTargets.length === 0 || applyProfileApplying"
         class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
         <svg x-show="applyProfileApplying" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
         <span x-text="applyProfileApplying ? 'Wird angewendet…' : 'Anwenden (' + applyProfileTargets.length + ')'"></span>
       </button>
-      <button @click="showApplyProfile=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+      <button @click="showApplyProfile=false" :disabled="applyProfileApplying"
+        class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200 disabled:opacity-50">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -1231,6 +1271,8 @@ function app() {
     applyProfileTargets: [],
     applyProfileMsg: '',
     applyProfileApplying: false,
+    applyProfileResults: {},
+    applyProfileProgress: {done: 0, total: 0},
     toast: '',
 
     // ─────────────────────────────────────────────────────────────
@@ -2048,38 +2090,62 @@ function app() {
 
     openApplyProfile(name) {
       this.applyProfileName = name;
-      this.applyProfileTargets = this.devices.map(d => d.address); // alle vorauswählen
+      this.applyProfileTargets = this.devices.map(d => d.address);
       this.applyProfileMsg = '';
       this.applyProfileApplying = false;
+      this.applyProfileResults = {};
+      this.applyProfileProgress = {done: 0, total: 0};
       this.showApplyProfile = true;
     },
 
     async submitApplyProfile() {
       if (!this.applyProfileTargets.length) return;
       this.applyProfileApplying = true;
-      this.applyProfileMsg = '';
-      const res = await fetch(`${API}/api/profiles/${this.applyProfileName}/apply`, {
+      this.applyProfileResults = {};
+      this.applyProfileProgress = {done: 0, total: this.applyProfileTargets.length};
+
+      const res = await fetch(`${API}/api/profiles/${encodeURIComponent(this.applyProfileName)}/apply`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({devices: this.applyProfileTargets, apply_schedules: true}),
       }).catch(() => null);
-      this.applyProfileApplying = false;
-      if (!res?.ok) {
-        this.applyProfileMsg = 'Fehler beim Anwenden.';
-        return;
+      if (!res?.ok) { this.applyProfileApplying = false; this.applyProfileMsg = 'Fehler beim Anwenden.'; return; }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const {value, done} = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, {stream: true});
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        let event = '', data = '';
+        for (const line of lines) {
+          if (line.startsWith('event:')) event = line.slice(6).trim();
+          else if (line.startsWith('data:')) data = line.slice(5).trim();
+          else if (line === '' && data) {
+            try {
+              const payload = JSON.parse(data);
+              if (event === 'progress') {
+                this.applyProfileResults = {...this.applyProfileResults, [payload.address]: 'applying'};
+              } else if (event === 'result') {
+                this.applyProfileResults = {...this.applyProfileResults, [payload.address]: payload.status};
+                this.applyProfileProgress = {...this.applyProfileProgress, done: this.applyProfileProgress.done + 1};
+              }
+            } catch {}
+            event = ''; data = '';
+          }
+        }
       }
-      const result = await res.json().catch(() => ({}));
-      const results = result.results || {};
-      const errors = Object.entries(results).filter(([,v]) => v !== 'ok');
+
+      this.applyProfileApplying = false;
+      await this.loadDevices();
+      const errors = Object.entries(this.applyProfileResults).filter(([,v]) => v !== 'ok');
       if (errors.length) {
-        const names = errors.map(([addr, err]) => {
-          const dev = this.devices.find(d => d.address.toUpperCase() === addr.toUpperCase());
-          return `${dev?.name || addr.substring(0,8)}: ${err}`;
-        });
-        this.applyProfileMsg = 'Fehler bei: ' + names.join(', ');
+        this.applyProfileMsg = `Fehler bei ${errors.length} Gerät(en)`;
       } else {
         this.applyProfileMsg = `✓ Auf ${this.applyProfileTargets.length} Gerät(e) angewendet`;
-        await this.loadDevices();
-        setTimeout(() => { this.showApplyProfile = false; this.applyProfileMsg = ''; }, 1200);
+        setTimeout(() => { this.showApplyProfile = false; this.applyProfileMsg = ''; }, 1500);
       }
     },
 
