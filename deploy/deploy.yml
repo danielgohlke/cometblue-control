@@ -29,11 +29,19 @@
         update_cache: true
       tags: [setup]
 
+    - name: Bluetooth AutoEnable aktivieren
+      lineinfile:
+        path: /etc/bluetooth/main.conf
+        regexp: "^#?AutoEnable"
+        line: "AutoEnable=true"
+        insertafter: "^\\[Policy\\]"
+      tags: [setup]
+
     - name: Bluetooth-Service aktivieren
       systemd:
         name: bluetooth
         enabled: true
-        state: started
+        state: restarted
       tags: [setup]
 
     - name: User zur bluetooth-Gruppe hinzufügen
