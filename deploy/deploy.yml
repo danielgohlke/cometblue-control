@@ -93,6 +93,36 @@
       become_user: "{{ service_user }}"
       tags: [setup, update]
 
+    # ── TLS-Zertifikat (self-signed) ───────────────────────────────
+    - name: TLS-Verzeichnis anlegen
+      file:
+        path: /etc/cometblue/tls
+        state: directory
+        owner: root
+        group: "{{ service_user }}"
+        mode: "0750"
+      tags: [setup]
+
+    - name: Self-signed TLS-Zertifikat generieren
+      command: >
+        openssl req -x509 -nodes -days 3650
+        -newkey rsa:2048
+        -keyout /etc/cometblue/tls/key.pem
+        -out /etc/cometblue/tls/cert.pem
+        -subj "/CN=raspberry.local"
+        -addext "subjectAltName=DNS:raspberry.local,DNS:localhost,IP:127.0.0.1"
+      args:
+        creates: /etc/cometblue/tls/cert.pem
+      tags: [setup]
+
+    - name: TLS-Schlüssel lesbar für service_user setzen
+      file:
+        path: /etc/cometblue/tls/key.pem
+        owner: root
+        group: "{{ service_user }}"
+        mode: "0640"
+      tags: [setup]
+
     # ── Konfiguration ──────────────────────────────────────────────
     - name: Config-Verzeichnis anlegen
       file:
@@ -120,6 +150,22 @@
         path: "{{ config_dir }}/config.yaml"
         regexp: "^port:"
         line: "port: {{ port }}"
+      become_user: "{{ service_user }}"
+      tags: [setup]
+
+    - name: SSL-Zertifikat in Config setzen
+      lineinfile:
+        path: "{{ config_dir }}/config.yaml"
+        regexp: "^#?\\s*ssl_certfile:"
+        line: "ssl_certfile: \"/etc/cometblue/tls/cert.pem\""
+      become_user: "{{ service_user }}"
+      tags: [setup]
+
+    - name: SSL-Schlüssel in Config setzen
+      lineinfile:
+        path: "{{ config_dir }}/config.yaml"
+        regexp: "^#?\\s*ssl_keyfile:"
+        line: "ssl_keyfile: \"/etc/cometblue/tls/key.pem\""
       become_user: "{{ service_user }}"
       tags: [setup]
 

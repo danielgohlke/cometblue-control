@@ -18,3 +18,7 @@ mcp:
   enabled: false
 
 log_level: "INFO"
+
+# TLS/HTTPS (optional)
+# ssl_certfile: "/etc/cometblue/tls/cert.pem"
+# ssl_keyfile:  "/etc/cometblue/tls/key.pem"

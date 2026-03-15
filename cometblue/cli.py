@@ -38,8 +38,12 @@ def serve(host, port, reload):
     _host = host or cfg.get("host", "0.0.0.0")
     _port = port or cfg.get("port", 8080)
 
-    click.echo(f"Starting CometBlue Control on http://{_host}:{_port}")
-    click.echo(f"API docs: http://{_host}:{_port}/docs")
+    ssl_certfile = cfg.get("ssl_certfile")
+    ssl_keyfile = cfg.get("ssl_keyfile")
+    scheme = "https" if ssl_certfile else "http"
+
+    click.echo(f"Starting CometBlue Control on {scheme}://{_host}:{_port}")
+    click.echo(f"API docs: {scheme}://{_host}:{_port}/docs")
 
     uvicorn.run(
         "cometblue.api.app:create_app",
@@ -48,6 +52,8 @@ def serve(host, port, reload):
         port=_port,
         reload=reload,
         log_level=cfg.get("log_level", "info").lower(),
+        ssl_certfile=ssl_certfile or None,
+        ssl_keyfile=ssl_keyfile or None,
     )
 
 
