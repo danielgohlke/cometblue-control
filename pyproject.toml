@@ -12,6 +12,7 @@ license = { text = "MIT" }
 dependencies = [
     "bleak>=0.21",
     "fastapi>=0.110",
+    "sse-starlette>=1.6",
     "uvicorn[standard]>=0.29",
     "apscheduler>=3.10",
     "pydantic>=2.0",
