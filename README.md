@@ -470,6 +470,46 @@ journalctl -u cometblue -f
 
 Access the UI from another device: `http://<raspberry-pi-ip>:8080`
 
+### Deployment with Ansible
+
+The `deploy/` directory contains an Ansible playbook for automated deployment to a Raspberry Pi.
+
+**Prerequisites (on your Mac):**
+```bash
+pip install ansible
+# SSH key auth must be set up (no password prompt)
+ssh-copy-id drg@raspberry.local
+```
+
+**Configure inventory** (`deploy/inventory.ini`):
+```ini
+[cometblue]
+raspberrypi ansible_host=raspberry.local ansible_user=pi
+```
+
+**First deploy** (installs all packages, creates venv, sets up systemd service):
+```bash
+ansible-playbook -i deploy/inventory.ini deploy/deploy.yml
+```
+
+**Update** (rsync code, reinstall pip packages, restart service):
+```bash
+ansible-playbook -i deploy/inventory.ini deploy/deploy.yml --tags update
+```
+
+What the playbook does:
+- Installs system packages: `python3`, `python3-venv`, `bluetooth`, `bluez`, `git`
+- Adds the user to the `bluetooth` group
+- Syncs code to `/opt/cometblue-control/` via rsync (excludes `.git`, `.venv`, `__pycache__`)
+- Creates a virtualenv and installs the package with `pip install -e .`
+- Copies default config/profiles to `~/.cometblue/` (existing config is never overwritten)
+- Installs and starts the `cometblue.service` systemd unit
+
+**Check service status on the Pi:**
+```bash
+ssh drg@raspberry.local "journalctl -u cometblue -f"
+```
+
 ### Bluetooth permissions on Linux
 
 If you get permission errors with Bluetooth:
