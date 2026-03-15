@@ -1,0 +1,18 @@
+[Unit]
+Description=CometBlue Control — BLE thermostat management service
+After=network.target bluetooth.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/opt/cometblue-control
+ExecStart=/opt/cometblue-control/.venv/bin/cometblue-control serve
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cometblue
+
+[Install]
+WantedBy=multi-user.target

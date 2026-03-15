@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="en" x-data="app()" x-init="init()">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CometBlue Control</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-bar { transition: width 0.4s linear; }
+    .ble-bar { animation: ble-slide 1.4s ease-in-out infinite; }
+    @keyframes ble-slide {
+      0%   { transform: translateX(-100%); }
+      50%  { transform: translateX(0%); }
+      100% { transform: translateX(100%); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans" x-cloak>
+
+<!-- BLE Loading bar (top) — shown when any device is busy -->
+<div x-show="Object.keys(busyDevices).length > 0" class="fixed top-0 left-0 right-0 z-[100] h-0.5 bg-blue-100 overflow-hidden">
+  <div class="ble-bar h-full w-1/2 bg-blue-500 rounded-full"></div>
+</div>
+
+<!-- Navigation -->
+<nav class="bg-blue-700 text-white shadow-md">
+  <div class="max-w-6xl mx-auto px-4 flex items-center gap-1 h-14">
+    <span class="font-bold text-lg tracking-wide mr-4">🔥 CometBlue</span>
+    <template x-for="tab in ['dashboard','monitor','devices','profiles','discovery']" :key="tab">
+      <button @click="page=tab; localStorage.setItem('cb_page',tab); onPageChange(tab)"
+        :class="page===tab ? 'border-b-2 border-white bg-blue-800' : 'opacity-70 hover:opacity-100'"
+        class="relative px-3 py-1 text-sm font-medium rounded-t capitalize">
+        <span x-text="tab"></span>
+        <span x-show="tab === 'dashboard' && alerts.length > 0"
+          class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center leading-none"
+          x-text="alerts.length"></span>
+      </button>
+    </template>
+    <div class="ml-auto flex items-center gap-3">
+      <span class="text-xs opacity-60" x-text="status.next_poll && autoPoll ? 'Next poll: ' + fmtTime(status.next_poll) : ''"></span>
+      <button @click="pollAll()" :disabled="pollingAll"
+        title="Alle Geräte sofort abfragen"
+        class="flex items-center gap-1 text-xs px-2 py-0.5 rounded transition-all"
+        :class="pollingAll ? 'bg-blue-800 opacity-70 cursor-not-allowed' : 'opacity-60 hover:opacity-100 hover:bg-blue-800'">
+        <svg :class="pollingAll ? 'animate-spin' : ''" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span x-text="pollingAll ? 'Polling…' : 'Poll all'"></span>
+      </button>
+      <!-- Auto-Poll Toggle -->
+      <label class="flex items-center gap-1.5 cursor-pointer" title="Automatisches Polling ein-/ausschalten">
+        <span class="text-xs" :class="autoPoll ? 'text-green-300' : 'text-white opacity-40'">Auto-Poll</span>
+        <button @click="toggleAutoPoll()"
+          class="relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none"
+          :class="autoPoll ? 'bg-green-500' : 'bg-gray-500'">
+          <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
+            :class="autoPoll ? 'translate-x-4' : 'translate-x-0'"></span>
+        </button>
+      </label>
+      <button @click="debugMode=!debugMode" title="Debug-Modus"
+        :class="debugMode ? 'bg-yellow-400 text-yellow-900' : 'opacity-40 hover:opacity-70 text-white'"
+        class="text-xs px-2 py-0.5 rounded font-mono transition-all">DBG</button>
+    </div>
+  </div>
+</nav>
+
+<!-- Alert Banner -->
+<div x-show="alerts.length > 0" class="max-w-6xl mx-auto px-4 pt-3 space-y-1.5">
+  <template x-for="a in alerts" :key="a.id">
+    <div class="flex items-center gap-2 text-sm px-3 py-2 rounded-lg"
+      :class="{
+        'bg-red-50 border border-red-200 text-red-800': a.level === 'error',
+        'bg-yellow-50 border border-yellow-200 text-yellow-800': a.level === 'warn',
+        'bg-blue-50 border border-blue-200 text-blue-700': a.level === 'info'
+      }">
+      <span x-text="a.level === 'error' ? '🔴' : a.level === 'warn' ? '🟡' : 'ℹ️'"></span>
+      <span x-text="a.msg"></span>
+    </div>
+  </template>
+</div>
+
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+  <!-- ══════════════════ DASHBOARD ══════════════════ -->
+  <div x-show="page === 'dashboard'">
+    <h1 class="text-2xl font-bold mb-4">Dashboard</h1>
+    <div x-show="devices.length === 0" class="text-gray-500 italic">
+      No devices configured. Go to <button @click="page='discovery'" class="text-blue-600 underline">Discover</button>.
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <template x-for="dev in devices" :key="dev.address">
+        <div class="bg-white rounded-xl shadow p-4 border border-gray-100 relative overflow-hidden">
+          <!-- Per-card BLE loading bar -->
+          <div x-show="busyDevices[dev.address]" class="absolute top-0 left-0 right-0 h-0.5 bg-blue-100 overflow-hidden z-10">
+            <div class="ble-bar h-full w-1/2 bg-blue-500"></div>
+          </div>
+          <div class="flex justify-between items-start mb-2">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1">
+                <span class="font-semibold truncate" x-text="dev.name || dev.address"></span>
+                <button @click="openRename(dev)" class="text-gray-400 hover:text-blue-500 flex-shrink-0" title="Rename">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button @click="removeDevice(dev.address)" class="text-gray-300 hover:text-red-500 flex-shrink-0" title="Remove">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+              <div class="text-xs text-gray-400" x-text="fmtAddr(dev.address)" :title="dev.address"></div>
+              <div x-show="dev.mac_address" class="text-xs text-blue-500 font-mono" x-text="'MAC: ' + dev.mac_address"></div>
+            </div>
+            <div class="text-right flex-shrink-0 ml-2">
+              <div x-show="dev.status?.battery != null" class="text-xs text-gray-500" title="CometBlue-Batteriewert: Neue Batterien zeigen ~80–90% (nicht 100%), da das Gerät die Rohspannung ohne Kalibrierung ausgibt.">🔋 <span x-text="dev.status?.battery + '%'"></span></div>
+              <div class="text-xs"
+                :class="dev.status?.error ? 'text-red-500' : (dev.status?.polled_at ? 'text-green-500' : 'text-gray-400')"
+                x-text="dev.status?.error
+                  ? (dev.status.error.startsWith('auth_failed') ? 'Wrong PIN' : 'Error')
+                  : (dev.status?.polled_at ? 'OK' : 'Not polled')"></div>
+            </div>
+          </div>
+
+          <!-- RSSI bar -->
+          <div x-show="dev.rssi != null" class="mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-400 w-8">RSSI</span>
+              <div class="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                <div class="h-1.5 rounded-full transition-all duration-500"
+                  :class="dev.rssi >= -60 ? 'bg-green-500' : dev.rssi >= -75 ? 'bg-yellow-400' : 'bg-red-400'"
+                  :style="`width: ${Math.max(0, Math.min(100, (dev.rssi + 100) * 2.5))}%`"></div>
+              </div>
+              <span class="text-xs text-gray-400 w-14 text-right" x-text="dev.rssi + ' dBm'"></span>
+            </div>
+          </div>
+
+          <div x-show="dev.status && (dev.status.temp_current != null || dev.status.temp_comfort != null)" class="mt-3 space-y-1"
+            :class="dev.status?.error ? 'opacity-60' : ''">
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-500">Aktuell</span>
+              <span class="font-bold text-blue-600" x-text="fmt(dev.status?.temp_current) + ' °C'"></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-500">Heizen</span>
+              <span class="font-semibold text-orange-600" x-text="fmt(dev.status?.temp_comfort) + ' °C'"></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-500">Absenken</span>
+              <span class="text-sm text-blue-500" x-text="fmt(dev.status?.temp_eco) + ' °C'"></span>
+            </div>
+            <div x-show="dev.status?.child_lock != null" class="flex justify-between">
+              <span class="text-sm text-gray-500">Kindersicherung</span>
+              <span class="text-sm font-medium"
+                :class="dev.status?.child_lock ? 'text-orange-600' : 'text-gray-400'"
+                x-text="dev.status?.child_lock ? '🔒 AN' : '🔓 AUS'"></span>
+            </div>
+            <!-- Debug section -->
+            <template x-if="debugMode && dev.status">
+              <div class="mt-2 pt-2 border-t border-dashed border-yellow-300 space-y-0.5">
+                <div class="text-xs font-medium text-yellow-600 mb-1">🐛 Debug</div>
+                <template x-for="[k, v] in Object.entries(dev.status).filter(([k]) => !['address'].includes(k))" :key="k">
+                  <div class="flex justify-between gap-2">
+                    <span class="text-xs text-gray-400 shrink-0" x-text="k"></span>
+                    <span class="text-xs text-gray-500 font-mono truncate" x-text="v ?? '—'"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <!-- Error state -->
+          <div x-show="dev.status?.error" class="mt-3 bg-red-50 border border-red-100 rounded-lg p-3">
+            <div class="text-sm font-medium text-red-700"
+              x-text="dev.status?.error?.startsWith('auth_failed') ? '🔒 Authentication failed — wrong PIN?' : '⚠ Connection error'"></div>
+            <div class="text-xs text-red-400 mt-0.5 truncate"
+              x-text="(dev.status?.error || '').replace(/^(auth_failed|ble_error): /, '')"></div>
+            <button x-show="dev.status?.error?.includes('not found') && dev.mac_address"
+              @click="rediscoverDevice(dev)"
+              class="mt-2 w-full text-xs bg-orange-100 text-orange-700 border border-orange-200 rounded px-2 py-1 hover:bg-orange-200">
+              🔍 Neu suchen (UUID aktualisieren)
+            </button>
+          </div>
+
+          <!-- Never polled state -->
+          <div x-show="!dev.status" class="mt-3 text-sm text-gray-400 italic">
+            Never polled. Press <strong>Poll</strong> to fetch data.
+          </div>
+
+          <!-- BLE busy status strip -->
+          <div x-show="busyDevices[dev.address]" class="mt-2 mb-1 flex items-center gap-1.5 text-xs text-blue-500">
+            <svg class="spinner w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            <span x-text="busyDevices[dev.address]"></span>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button @click="openSetTemp(dev)" :disabled="!!busyDevices[dev.address]"
+              class="flex-1 text-sm bg-blue-600 text-white rounded px-3 py-1 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">🌡 Temperaturen</button>
+            <button @click="openSchedule(dev)" :disabled="!!busyDevices[dev.address]"
+              class="flex-1 text-sm bg-green-600 text-white rounded px-3 py-1 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">⏰ Heizzeiten</button>
+          </div>
+          <div class="mt-1.5 flex gap-2">
+            <button @click="pollDevice(dev.address)" :disabled="!!pollingDevices[dev.address] || !!busyDevices[dev.address]"
+              class="flex-1 text-sm bg-gray-100 rounded px-3 py-1 hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center gap-1">
+              <svg x-show="!!pollingDevices[dev.address]" class="spinner w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+              </svg>
+              <span x-text="pollingDevices[dev.address] ? 'Polling…' : '↻ Poll'"></span>
+            </button>
+            <button @click="openFixPin(dev)" :disabled="!!busyDevices[dev.address]"
+              class="text-sm bg-yellow-100 text-yellow-800 rounded px-3 py-1 hover:bg-yellow-200 disabled:opacity-50">🔑 PIN</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ══════════════════ MONITOR ══════════════════ -->
+  <div x-show="page === 'monitor'">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">Temperature Monitor</h1>
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-500">Range:</span>
+        <template x-for="h in [1,6,24,72,168]" :key="h">
+          <button @click="monitorHours=h; loadMonitor()"
+            :class="monitorHours===h ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border hover:bg-gray-50'"
+            class="px-2.5 py-1 rounded text-xs font-medium"
+            x-text="h < 24 ? h+'h' : (h/24|0)+'d'"></button>
+        </template>
+        <button @click="loadMonitor()" class="ml-1 text-gray-400 hover:text-blue-600" title="Refresh">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div x-show="monitorLoading" class="flex justify-center py-16 text-gray-400 gap-2">
+      <svg class="spinner w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+      Loading history…
+    </div>
+
+    <div x-show="!monitorLoading && devices.length === 0" class="text-gray-400 italic">
+      No devices configured yet.
+    </div>
+
+    <div x-show="!monitorLoading" class="space-y-6">
+      <template x-for="dev in devices" :key="dev.address">
+        <div class="bg-white rounded-xl shadow p-4 border border-gray-100">
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <div class="font-semibold" x-text="dev.name"></div>
+              <div class="text-xs text-gray-400" x-text="dev.address"></div>
+            </div>
+            <div class="text-right text-sm">
+              <div x-show="dev.status?.temp_current != null">
+                Aktuell: <span class="font-bold text-blue-600" x-text="fmt(dev.status?.temp_current) + ' °C'"></span>
+              </div>
+              <div x-show="dev.status?.battery != null" class="text-xs text-gray-400" title="CometBlue-Batteriewert: Neue Batterien zeigen ~80–90% (nicht 100%), da das Gerät die Rohspannung ohne Kalibrierung ausgibt.">
+                🔋 <span x-text="dev.status?.battery + '%'"></span>
+              </div>
+            </div>
+          </div>
+          <!-- Chart canvas — ID keyed by address -->
+          <div class="relative h-56">
+            <canvas :id="'chart-' + dev.address"></canvas>
+            <div x-show="!monitorData[dev.address]?.length"
+              class="absolute inset-0 flex items-center justify-center text-gray-300 text-sm">
+              No data yet — waiting for first poll
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ══════════════════ DEVICES ══════════════════ -->
+  <div x-show="page === 'devices'">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">Devices</h1>
+      <button @click="showAddDevice=true" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">+ Add Device</button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+          <tr>
+            <th class="px-4 py-3 text-left">Name</th>
+            <th class="px-4 py-3 text-left">Adresse</th>
+            <th class="px-4 py-3 text-left">Aktuell °C</th>
+            <th class="px-4 py-3 text-left">Batterie</th>
+            <th class="px-4 py-3 text-left">Zuletzt gesehen</th>
+            <th class="px-4 py-3 text-left">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <template x-for="dev in devices" :key="dev.address">
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-medium" x-text="dev.name"></span>
+                  <button @click="openRename(dev)" class="text-gray-400 hover:text-blue-500" title="Rename">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                  </button>
+                </div>
+              </td>
+              <td class="px-4 py-3 font-mono text-xs text-gray-500" x-text="fmtAddr(dev.address)" :title="dev.address"></td>
+              <td class="px-4 py-3" x-text="fmt(dev.status?.temp_current)"></td>
+              <td class="px-4 py-3" title="CometBlue-Batteriewert: Neue Batterien zeigen ~80–90% (nicht 100%), da das Gerät die Rohspannung ohne Kalibrierung ausgibt." x-text="dev.status?.battery != null ? dev.status.battery + '%' : '—'"></td>
+              <td class="px-4 py-3 text-xs text-gray-400" x-text="dev.last_seen ? fmtDate(dev.last_seen) : '—'"></td>
+              <td class="px-4 py-3">
+                <div class="flex gap-3">
+                  <button @click="openSetTemp(dev)" class="text-blue-600 hover:underline">Temps</button>
+                  <button @click="pollDevice(dev.address)" :disabled="!!pollingDevices[dev.address]"
+                    class="text-gray-500 hover:underline disabled:opacity-40 flex items-center gap-1">
+                    <svg x-show="!!pollingDevices[dev.address]" class="spinner w-3 h-3" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                    </svg>
+                    <span x-text="pollingDevices[dev.address] ? 'Polling…' : 'Poll'"></span>
+                  </button>
+                  <button @click="openFixPin(dev)" class="text-yellow-600 hover:underline" title="Set/update PIN">
+                    PIN <span x-text="dev.pin != null ? '(' + dev.pin + ')' : ''"></span>
+                  </button>
+                  <button @click="removeDevice(dev.address)" class="text-red-500 hover:underline">Remove</button>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="devices.length === 0">
+            <td colspan="6" class="px-4 py-8 text-center text-gray-400">No devices. Add one or use Discover.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════ PROFILES ══════════════════ -->
+  <div x-show="page === 'profiles'">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">Heating Profiles</h1>
+      <button @click="openNewProfile()" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">+ New Profile</button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <template x-for="p in profiles" :key="p.name">
+        <div class="bg-white rounded-xl shadow p-4 border border-gray-100">
+          <div class="flex justify-between items-start mb-2">
+            <div class="font-semibold text-lg capitalize" x-text="p.name"></div>
+            <button @click="openEditProfile(p)" class="text-gray-400 hover:text-blue-500" title="Edit">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            </button>
+          </div>
+          <div class="space-y-1 text-sm text-gray-600 mb-3">
+            <div class="flex justify-between"><span>Heizen</span>   <span class="font-medium text-orange-600" x-text="p.comfort_temp != null ? p.comfort_temp + ' °C' : '—'"></span></div>
+            <div class="flex justify-between"><span>Absenken</span> <span class="font-medium text-blue-500"   x-text="p.eco_temp     != null ? p.eco_temp     + ' °C' : '—'"></span></div>
+          </div>
+          <template x-if="p.schedules && Object.keys(p.schedules).length > 0">
+            <div class="mb-3 space-y-0.5">
+              <div class="text-xs font-medium text-gray-500 mb-1">⏰ Heizzeiten</div>
+              <template x-for="[day, periods] in Object.entries(p.schedules)" :key="day">
+                <div class="text-xs text-gray-500 flex gap-1 flex-wrap">
+                  <span class="font-medium text-gray-700 w-16" x-text="profileDayLabel(day)"></span>
+                  <template x-for="period in periods.filter(pp => pp.start && pp.end)" :key="period.start">
+                    <span class="bg-blue-50 text-blue-700 rounded px-1" x-text="period.start + '–' + period.end"></span>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+          <button @click="openApplyProfile(p.name)" class="w-full bg-blue-600 text-white rounded px-3 py-1.5 text-sm hover:bg-blue-700">Anwenden…</button>
+        </div>
+      </template>
+      <div x-show="profiles.length === 0" class="col-span-3 text-gray-400 italic">No profiles yet. Create one with "+ New Profile".</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ DISCOVERY ══════════════════ -->
+  <div x-show="page === 'discovery'">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">Discover Devices</h1>
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-gray-500 flex items-center gap-1.5" x-show="!discovering">
+          Duration:
+          <select x-model.number="scanTimeout" class="border rounded px-2 py-1 text-sm">
+            <option value="10">10 s</option>
+            <option value="20">20 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
+        </label>
+        <button @click="runDiscovery()" :disabled="discovering"
+          class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+          <svg x-show="discovering" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          <span x-text="discovering ? 'Scanning…' : 'Scan'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div x-show="discovering || scanDone" class="mb-5">
+      <div class="flex justify-between text-xs text-gray-500 mb-1">
+        <span x-show="discovering" x-text="`Scanning… ${Math.round(scanElapsed)}s / ${scanTimeout}s`"></span>
+        <span x-show="!discovering && scanDone" class="text-green-600 font-medium">Scan complete</span>
+        <span x-text="discovered.length + ' device(s) found'"></span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+        <div class="progress-bar h-2 rounded-full"
+          :class="!discovering && scanDone ? 'bg-green-500' : 'bg-blue-500'"
+          :style="`width: ${scanProgress}%`"></div>
+      </div>
+    </div>
+
+    <!-- Known from DB (shown before scanning) -->
+    <div x-show="!discovering && !scanDone && knownDevices.length > 0" class="mb-6">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Previously Discovered</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <template x-for="d in knownDevices" :key="d.address">
+          <div class="bg-white rounded-xl shadow-sm p-3 border border-gray-100 flex justify-between items-center">
+            <div>
+              <div class="font-medium" x-text="d.name"></div>
+              <div class="text-xs font-mono text-gray-400" x-text="d.address"></div>
+              <div class="text-xs text-gray-400 mt-0.5">Last seen: <span x-text="fmtDate(d.last_seen)"></span></div>
+            </div>
+            <button @click="addDiscoveredDirect(d)" :disabled="d.configured"
+              class="text-sm px-3 py-1.5 rounded flex-shrink-0 ml-3"
+              :class="d.configured ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'">
+              <span x-text="d.configured ? '✓ Added' : 'Add'"></span>
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div x-show="!discovering && !scanDone && knownDevices.length === 0" class="text-gray-400 italic">
+      Press <strong>Scan</strong> to search for CometBlue devices via Bluetooth.
+    </div>
+    <div x-show="scanDone && discovered.length === 0" class="text-gray-400 italic mt-2">
+      No CometBlue devices found. Make sure the thermostat is nearby and awake.
+    </div>
+
+    <!-- Live scan results -->
+    <div x-show="discovered.length > 0">
+      <h2 x-show="scanDone || discovering" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3"
+        x-text="discovering ? 'Found so far…' : 'Scan Results'"></h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <template x-for="d in discovered" :key="d.address">
+          <div class="bg-white rounded-xl shadow p-4 border border-gray-100 flex justify-between items-center"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0">
+            <div>
+              <div class="font-semibold" x-text="d.name"></div>
+              <div class="text-xs font-mono text-gray-400" x-text="d.address"></div>
+              <div class="text-xs mt-1 text-blue-600 font-medium flex items-center gap-2">
+                CometBlue
+                <span x-show="d.rssi" class="text-gray-400 font-normal" x-text="'RSSI ' + d.rssi + ' dBm'"></span>
+              </div>
+            </div>
+            <div class="flex flex-col gap-1.5 flex-shrink-0 ml-3">
+              <button @click="addDiscoveredDirect(d)" :disabled="isConfigured(d.address)"
+                class="text-sm px-3 py-1.5 rounded"
+                :class="isConfigured(d.address) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'">
+                <span x-text="isConfigured(d.address) ? '✓ Vorhanden' : 'Hinzufügen'"></span>
+              </button>
+              <button @click="openAssignModal(d)"
+                title="Nur nötig wenn MAC-Auflösung nicht funktioniert. Normalfall: Gerät hinzufügen → Poll → UUID wird automatisch aktuell gehalten."
+                class="text-xs px-3 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200">
+                🔗 Zuordnen…
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══════════════════════════ MODALS ═══════════════════════════ -->
+
+<!-- Set Temperature -->
+<div x-show="showSetTemp" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showSetTemp=false">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <h2 class="text-lg font-bold mb-1">🌡 Temperaturen setzen</h2>
+    <p class="text-sm text-gray-500 mb-4" x-text="selectedDevice?.name || selectedDevice?.address"></p>
+    <div x-show="tempLoading" class="flex items-center justify-center py-8 gap-3 text-gray-400">
+      <svg class="spinner w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+      Lade aktuelle Einstellungen…
+    </div>
+    <div x-show="!tempLoading" class="space-y-3">
+      <label class="block">
+        <span class="text-sm font-medium text-orange-700">Heizen (°C)</span>
+        <span class="text-xs text-gray-400 ml-1">— Temperatur während der Heizzeiten</span>
+        <input type="number" step="0.5" min="5" max="35" x-model="tempForm.comfort" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="z.B. 22.0"></label>
+      <label class="block">
+        <span class="text-sm font-medium text-blue-600">Absenken (°C)</span>
+        <span class="text-xs text-gray-400 ml-1">— Temperatur außerhalb der Heizzeiten</span>
+        <input type="number" step="0.5" min="5" max="35" x-model="tempForm.eco" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="z.B. 17.0"></label>
+      <label class="block"><span class="text-sm text-gray-600">Offset (°C, z.B. -1.5 … +1.5)</span>
+        <input type="number" step="0.5" min="-3.5" max="3.5" x-model="tempForm.offset" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="0.0"></label>
+      <div class="flex items-center justify-between py-2 border-t">
+        <span class="text-sm text-gray-600">🔒 Kindersicherung</span>
+        <button @click="tempForm.child_lock = !tempForm.child_lock"
+          class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+          :class="tempForm.child_lock ? 'bg-orange-500' : 'bg-gray-200'">
+          <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+            :class="tempForm.child_lock ? 'translate-x-6' : 'translate-x-1'"></span>
+        </button>
+      </div>
+    </div>
+    <div x-show="!tempLoading" class="flex gap-2 mt-4">
+      <button @click="submitSetTemp()" :disabled="tempSaving"
+        class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
+        <svg x-show="tempSaving" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+        <span x-text="tempSaving ? 'Speichere…' : 'Speichern'"></span>
+      </button>
+      <button @click="showSetTemp=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+    </div>
+    <div x-show="tempMsg" class="mt-2 text-sm" :class="tempMsg?.startsWith('Error') ? 'text-red-500' : 'text-green-600'" x-text="tempMsg"></div>
+  </div>
+</div>
+
+<!-- Schedule / Heizzeiten -->
+<div x-show="showSchedule" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showSchedule=false">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+    <div class="flex justify-between items-start mb-1">
+      <div>
+        <h2 class="text-lg font-bold">⏰ Heizzeiten</h2>
+        <p class="text-sm text-gray-500" x-text="selectedDevice?.name || selectedDevice?.address"></p>
+      </div>
+      <button @click="showSchedule=false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+    </div>
+    <p class="text-xs text-gray-400 mb-3">Zeiten in 10-Minuten-Schritten. Leere Felder = Periode deaktiviert.</p>
+
+    <div x-show="scheduleLoading" class="flex items-center justify-center py-12 gap-3 text-gray-400 flex-1">
+      <svg class="spinner w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+      Lade Heizzeiten vom Gerät…
+    </div>
+
+    <div x-show="!scheduleLoading && scheduleForm" class="overflow-y-auto flex-1">
+      <template x-for="row in scheduleForm" :key="row.day">
+        <div class="border-b last:border-0 py-3">
+          <div class="font-medium text-sm text-gray-700 mb-2" x-text="row.label"></div>
+          <div class="space-y-1.5">
+            <template x-for="(p, pi) in row.periods" :key="pi">
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400 w-6" x-text="pi + 1"></span>
+                <input type="time" step="600" x-model="p.start"
+                  class="border rounded px-2 py-1 text-sm w-28"
+                  :class="p.start && !validTime(p.start) ? 'border-red-400' : ''">
+                <span class="text-gray-400">–</span>
+                <input type="time" step="600" x-model="p.end"
+                  class="border rounded px-2 py-1 text-sm w-28"
+                  :class="p.end && !validTime(p.end) ? 'border-red-400' : ''">
+                <button @click="p.start = ''; p.end = ''" class="text-gray-300 hover:text-red-500 text-sm" title="Löschen">✕</button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="pt-3 flex gap-2 border-t mt-3">
+      <button @click="submitSchedule()" :disabled="scheduleSaving"
+        class="flex-1 bg-green-600 text-white rounded px-4 py-2 text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
+        <svg x-show="scheduleSaving" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+        <span x-text="scheduleSaving ? 'Speichere…' : 'Speichern'"></span>
+      </button>
+      <button @click="showSchedule=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+    </div>
+    <div x-show="scheduleMsg" class="mt-2 text-sm text-center"
+      :class="scheduleMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'" x-text="scheduleMsg"></div>
+  </div>
+</div>
+
+<!-- PIN incorrect -->
+<div x-show="showPinPrompt" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <div class="flex items-start gap-3 mb-4">
+      <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-lg">🔒</div>
+      <div>
+        <h2 class="text-lg font-bold">PIN setzen</h2>
+        <p class="text-sm text-gray-500 mt-0.5">PIN für <strong x-text="selectedDevice?.name || selectedDevice?.address"></strong> eingeben, prüfen und speichern.</p>
+      </div>
+    </div>
+    <label class="block"><span class="text-sm text-gray-600">PIN</span>
+      <input type="number" x-model="pinPromptForm.pin" @keyup.enter="submitPinPrompt()"
+        class="mt-1 block w-full border-2 rounded px-3 py-2 text-sm font-mono"
+        :class="pinPromptMsg ? 'border-red-400' : 'border-gray-200'" placeholder="PIN eingeben (Standard: 0)"></label>
+    <div x-show="pinPromptMsg" class="mt-2 text-sm text-red-500">⚠ <span x-text="pinPromptMsg"></span></div>
+    <div class="flex gap-2 mt-4">
+      <button @click="submitPinPrompt()" :disabled="pinPromptTesting"
+        class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
+        <svg x-show="pinPromptTesting" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+        <span x-text="pinPromptTesting ? 'Prüfe…' : 'Prüfen & Speichern'"></span>
+      </button>
+      <button @click="showPinPrompt=false" class="bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+    </div>
+    <button @click="savePinWithoutTest()" :disabled="pinPromptTesting"
+      class="w-full mt-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded px-3 py-1.5 transition-colors"
+      title="PIN direkt speichern ohne BLE-Verbindung — z.B. wenn Gerät gerade offline ist">
+      Offline speichern (ohne Test)
+    </button>
+  </div>
+</div>
+
+<!-- Rename / Device Settings -->
+<div x-show="showRename" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showRename=false">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <h2 class="text-lg font-bold mb-1">Gerät bearbeiten</h2>
+    <p class="text-xs text-gray-400 font-mono mb-4" x-text="renameDevice?.address"></p>
+    <div class="space-y-3">
+      <label class="block"><span class="text-sm text-gray-600">Name</span>
+        <input type="text" x-model="renameForm.name"
+          class="mt-1 block w-full border-2 border-blue-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+          placeholder="z.B. Wohnzimmer Links"></label>
+      <label class="block"><span class="text-sm text-gray-600">PIN</span>
+        <input type="number" x-model="renameForm.pin"
+          class="mt-1 block w-full border-2 border-blue-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500"
+          placeholder="PIN (leer = unverändert)"></label>
+      <div class="block">
+        <span class="text-sm text-gray-600">Bluetooth MAC-Adresse</span>
+        <div x-show="renameDevice?.mac_address"
+          class="mt-1 px-3 py-1.5 bg-gray-50 border rounded text-sm font-mono text-blue-700"
+          x-text="renameDevice?.mac_address"></div>
+        <div x-show="!renameDevice?.mac_address"
+          class="mt-1 text-xs text-gray-400 italic">Wird automatisch beim nächsten Poll ermittelt.</div>
+      </div>
+    </div>
+    <div x-show="renameMsg" class="mt-2 text-sm" :class="renameMsg?.startsWith('Error') ? 'text-red-500' : 'text-green-600'" x-text="renameMsg"></div>
+    <div class="flex gap-2 mt-4">
+      <button @click="submitRename()" class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">Speichern</button>
+      <button @click="showRename=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+    </div>
+    <div class="mt-3 pt-3 border-t">
+      <button @click="resetDeviceData(renameDevice.address)"
+        class="w-full text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded px-3 py-1.5 transition-colors"
+        title="Löscht Verlauf und gecachten Status. Gerätekonfiguration (Name, PIN, MAC) bleibt erhalten.">
+        🗑 Daten zurücksetzen (Verlauf + Status löschen)
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Device -->
+<div x-show="showAddDevice" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showAddDevice=false">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <h2 class="text-lg font-bold mb-4">Add Device</h2>
+    <div class="space-y-3">
+      <label class="block"><span class="text-sm text-gray-600">MAC Address *</span>
+        <input type="text" x-model="addForm.address" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm font-mono" placeholder="E0:E5:CF:C1:D4:3F"></label>
+      <label class="block"><span class="text-sm text-gray-600">Name</span>
+        <input type="text" x-model="addForm.name" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="Living Room"></label>
+      <label class="block"><span class="text-sm text-gray-600">PIN (optional)</span>
+        <input type="number" x-model="addForm.pin" class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="Leave empty if no PIN"></label>
+    </div>
+    <div class="flex gap-2 mt-4">
+      <button @click="submitAddDevice()" class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">Add</button>
+      <button @click="showAddDevice=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Cancel</button>
+    </div>
+    <div x-show="addMsg" class="mt-2 text-sm" :class="addMsg?.startsWith('Error') ? 'text-red-500' : 'text-green-600'" x-text="addMsg"></div>
+  </div>
+</div>
+
+<!-- Profile Edit / Create -->
+<div x-show="showProfileModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showProfileModal=false">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+    <div class="flex justify-between items-start mb-4">
+      <h2 class="text-lg font-bold" x-text="profileEditMode ? 'Profil bearbeiten' : 'Neues Profil'"></h2>
+      <button @click="showProfileModal=false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+    </div>
+    <div class="overflow-y-auto flex-1 space-y-4">
+      <!-- Name + Temperaturen -->
+      <div class="space-y-3">
+        <label class="block">
+          <span class="text-sm text-gray-600">Name *</span>
+          <input type="text" x-model="profileForm.name" :readonly="profileEditMode"
+            :class="profileEditMode ? 'bg-gray-50 text-gray-500' : ''"
+            class="mt-1 block w-full border rounded px-3 py-1.5 text-sm"
+            placeholder="z.B. winter">
+        </label>
+        <div class="flex gap-3">
+          <label class="block flex-1">
+            <span class="text-sm text-gray-600">Heizen (°C)</span>
+            <input type="number" step="0.5" min="5" max="35" x-model="profileForm.comfort_temp"
+              class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="z.B. 22.0">
+          </label>
+          <label class="block flex-1">
+            <span class="text-sm text-gray-600">Absenken (°C)</span>
+            <input type="number" step="0.5" min="5" max="35" x-model="profileForm.eco_temp"
+              class="mt-1 block w-full border rounded px-3 py-1.5 text-sm" placeholder="z.B. 17.0">
+          </label>
+        </div>
+      </div>
+
+      <!-- Heizzeiten -->
+      <div>
+        <div class="text-sm font-medium text-gray-700 mb-1">⏰ Heizzeiten</div>
+        <p class="text-xs text-gray-400 mb-2">Zeiten in 10-Minuten-Schritten. Leere Felder = Periode deaktiviert.</p>
+
+        <!-- Tab-Auswahl -->
+        <div class="flex gap-1 mb-3">
+          <button @click="profileSchedTab='week'"
+            :class="profileSchedTab==='week' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+            class="px-3 py-1.5 rounded text-xs font-medium">Wochentage (Mo–Fr)</button>
+          <button @click="profileSchedTab='weekend'"
+            :class="profileSchedTab==='weekend' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+            class="px-3 py-1.5 rounded text-xs font-medium">Wochenende (Sa–So)</button>
+          <button @click="profileSchedTab='individual'"
+            :class="profileSchedTab==='individual' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+            class="px-3 py-1.5 rounded text-xs font-medium">Individuell</button>
+        </div>
+
+        <!-- Wochentage -->
+        <div x-show="profileSchedTab==='week'">
+          <div class="space-y-1.5">
+            <template x-for="(p, pi) in profileWeekPeriods" :key="pi">
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400 w-4" x-text="pi + 1"></span>
+                <input type="time" step="600" x-model="p.start"
+                  class="border rounded px-2 py-1 text-sm w-28"
+                  :class="p.start && !validTime(p.start) ? 'border-red-400' : ''">
+                <span class="text-gray-400 text-sm">–</span>
+                <input type="time" step="600" x-model="p.end"
+                  class="border rounded px-2 py-1 text-sm w-28"
+                  :class="p.end && !validTime(p.end) ? 'border-red-400' : ''">
+                <button @click="p.start=''; p.end=''" class="text-gray-300 hover:text-red-500 text-sm" title="Löschen">✕</button>
+              </div>
+            </template>
+          </div>
+          <button @click="applyWeekToSchedule()"
+            class="mt-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded px-3 py-1 hover:bg-green-100">
+            → Mo–Fr übernehmen
+          </button>
+        </div>
+
+        <!-- Wochenende -->
+        <div x-show="profileSchedTab==='weekend'">
+          <div class="space-y-1.5">
+            <template x-for="(p, pi) in profileWeekendPeriods" :key="pi">
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400 w-4" x-text="pi + 1"></span>
+                <input type="time" step="600" x-model="p.start"
+                  class="border rounded px-2 py-1 text-sm w-28"
+                  :class="p.start && !validTime(p.start) ? 'border-red-400' : ''">
+                <span class="text-gray-400 text-sm">–</span>
+                <input type="time" step="600" x-model="p.end"
+                  class="border rounded px-2 py-1 text-sm w-28"
+                  :class="p.end && !validTime(p.end) ? 'border-red-400' : ''">
+                <button @click="p.start=''; p.end=''" class="text-gray-300 hover:text-red-500 text-sm" title="Löschen">✕</button>
+              </div>
+            </template>
+          </div>
+          <button @click="applyWeekendToSchedule()"
+            class="mt-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded px-3 py-1 hover:bg-green-100">
+            → Sa–So übernehmen
+          </button>
+        </div>
+
+        <!-- Individuell -->
+        <div x-show="profileSchedTab==='individual'">
+          <template x-for="row in profileScheduleForm" :key="row.day">
+            <div class="border-b last:border-0 py-2">
+              <div class="font-medium text-xs text-gray-600 mb-1.5" x-text="row.label"></div>
+              <div class="space-y-1">
+                <template x-for="(p, pi) in row.periods" :key="pi">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400 w-4" x-text="pi + 1"></span>
+                    <input type="time" step="600" x-model="p.start"
+                      class="border rounded px-2 py-1 text-sm w-28"
+                      :class="p.start && !validTime(p.start) ? 'border-red-400' : ''">
+                    <span class="text-gray-400 text-sm">–</span>
+                    <input type="time" step="600" x-model="p.end"
+                      class="border rounded px-2 py-1 text-sm w-28"
+                      :class="p.end && !validTime(p.end) ? 'border-red-400' : ''">
+                    <button @click="p.start=''; p.end=''" class="text-gray-300 hover:text-red-500 text-sm" title="Löschen">✕</button>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <div x-show="profileMsg" class="mt-3 text-sm"
+      :class="profileMsg.startsWith('Fehler') ? 'text-red-500' : 'text-green-600'" x-text="profileMsg"></div>
+    <div class="flex gap-2 mt-4 pt-3 border-t">
+      <button @click="submitProfileModal()" class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700">Speichern</button>
+      <button x-show="profileEditMode" @click="deleteProfile(profileForm.name)"
+        class="bg-red-100 text-red-600 rounded px-4 py-2 text-sm hover:bg-red-200">Löschen</button>
+      <button @click="showProfileModal=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign discovered device to existing record -->
+<div x-show="showAssignModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showAssignModal=false">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <h2 class="text-lg font-bold mb-1">🔗 Gerät manuell zuordnen</h2>
+    <p class="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1 mb-3">⚠ Nur als Fallback nötig. Normalerweise erkennt das System nach einem Batteriewechsel die neue UUID automatisch anhand der gespeicherten MAC-Adresse.</p>
+    <p class="text-sm text-gray-500 mb-1">Gefundene neue UUID:</p>
+    <p class="text-xs font-mono text-gray-700 bg-gray-50 rounded px-2 py-1 mb-4" x-text="assignDevice?.address"></p>
+    <p class="text-sm text-gray-600 mb-2">Welchem gespeicherten Gerät soll diese UUID zugeordnet werden?</p>
+    <select x-model="assignTargetAddress" class="w-full border rounded px-3 py-2 text-sm mb-4">
+      <option value="">— Gerät auswählen —</option>
+      <template x-for="dev in devices" :key="dev.address">
+        <option :value="dev.address" x-text="(dev.name || dev.address) + ' (' + dev.address.substring(0,8) + '…)'"></option>
+      </template>
+    </select>
+    <p class="text-xs text-gray-400 mb-4">Die UUID des gewählten Geräts wird durch die neue ersetzt. Alle Daten (Status, Verlauf) bleiben erhalten.</p>
+    <div x-show="assignMsg" class="text-sm mb-3" :class="assignMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'" x-text="assignMsg"></div>
+    <div class="flex gap-2">
+      <button @click="submitAssign()" :disabled="!assignTargetAddress"
+        class="flex-1 bg-orange-600 text-white rounded px-4 py-2 text-sm hover:bg-orange-700 disabled:opacity-50">
+        Zuordnen & UUID ersetzen
+      </button>
+      <button @click="showAssignModal=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Apply Profile Modal -->
+<div x-show="showApplyProfile" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showApplyProfile=false">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <h2 class="text-lg font-bold mb-1">Profil anwenden</h2>
+    <p class="text-sm text-gray-500 mb-4">Profil <strong x-text="applyProfileName"></strong> auf folgende Geräte anwenden:</p>
+    <div class="space-y-2 mb-4">
+      <template x-for="dev in devices" :key="dev.address">
+        <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-2 py-1">
+          <input type="checkbox" :value="dev.address" x-model="applyProfileTargets"
+            class="rounded border-gray-300 text-blue-600">
+          <span class="text-sm font-medium" x-text="dev.name || dev.address"></span>
+          <span class="text-xs text-gray-400 font-mono ml-auto" x-text="dev.address.substring(0,8) + '…'"></span>
+        </label>
+      </template>
+    </div>
+    <div class="flex gap-2 text-xs mb-4">
+      <button @click="applyProfileTargets = devices.map(d => d.address)"
+        class="text-blue-600 hover:underline">Alle auswählen</button>
+      <span class="text-gray-300">|</span>
+      <button @click="applyProfileTargets = []"
+        class="text-gray-500 hover:underline">Keine</button>
+    </div>
+    <div x-show="applyProfileMsg" class="text-sm mb-3"
+      :class="applyProfileMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'"
+      x-text="applyProfileMsg"></div>
+    <div class="flex gap-2">
+      <button @click="submitApplyProfile()" :disabled="applyProfileTargets.length === 0 || applyProfileApplying"
+        class="flex-1 bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
+        <svg x-show="applyProfileApplying" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+        <span x-text="applyProfileApplying ? 'Wird angewendet…' : 'Anwenden (' + applyProfileTargets.length + ')'"></span>
+      </button>
+      <button @click="showApplyProfile=false" class="flex-1 bg-gray-100 rounded px-4 py-2 text-sm hover:bg-gray-200">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div x-show="toast" x-transition class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg text-sm z-50" x-text="toast"></div>
+
+<script>
+const API = '';
+const CHART_COLORS = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899'];
+
+// Chart registry so we can destroy/redraw
+const _charts = {};
+
+function destroyChart(id) {
+  if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
+}
+
+function drawChart(canvasId, records, deviceName) {
+  destroyChart(canvasId);
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !records.length) return;
+
+  const color = CHART_COLORS[Object.keys(_charts).length % CHART_COLORS.length];
+  const hasBattery = records.some(r => r.battery != null && r.battery !== 255);
+  const pts = records.length > 60 ? 0 : 2;
+
+  _charts[canvasId] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Aktuell',
+          data: records.map(r => ({x: r.recorded_at, y: r.temp_current})),
+          borderColor: color,
+          backgroundColor: color + '20',
+          fill: true,
+          tension: 0.3,
+          pointRadius: pts,
+          borderWidth: 2,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Heizen',
+          data: records.map(r => ({x: r.recorded_at, y: r.temp_comfort})),
+          borderColor: '#f97316',
+          borderDash: [4, 3],
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 1.5,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Absenken',
+          data: records.map(r => ({x: r.recorded_at, y: r.temp_eco})),
+          borderColor: '#60a5fa',
+          borderDash: [2, 4],
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 1.5,
+          yAxisID: 'y',
+        },
+        ...(hasBattery ? [{
+          label: 'Batterie',
+          data: records.filter(r => r.battery != null && r.battery !== 255).map(r => ({x: r.recorded_at, y: r.battery})),
+          borderColor: '#22c55e',
+          borderDash: [3, 3],
+          fill: false,
+          tension: 0.3,
+          pointRadius: pts,
+          borderWidth: 1.5,
+          yAxisID: 'y1',
+        }] : []),
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.yAxisID === 'y1'
+              ? `${ctx.dataset.label}: ${ctx.parsed.y}% (neu = ~80–90%)`
+              : `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)} °C`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { tooltipFormat: 'dd.MM HH:mm', displayFormats: { hour: 'HH:mm', day: 'dd.MM' } },
+          grid: { color: '#f1f5f9' },
+          ticks: { font: { size: 10 }, maxTicksLimit: 8 },
+        },
+        y: {
+          position: 'left',
+          title: { display: true, text: '°C', font: { size: 10 } },
+          grid: { color: '#f1f5f9' },
+          ticks: { font: { size: 10 }, callback: v => v + '°' },
+        },
+        y1: {
+          position: 'right',
+          min: 0, max: 100,
+          title: { display: true, text: 'Batterie %', font: { size: 10 } },
+          grid: { drawOnChartArea: false },
+          ticks: { font: { size: 10 }, callback: v => v + '%' },
+        },
+      },
+    },
+  });
+}
+
+function app() {
+  return {
+    page: localStorage.getItem('cb_page') || 'dashboard',
+    devices: [],
+    profiles: [],
+    status: {},
+    alerts: [],
+
+    // Monitor
+    monitorHours: 24,
+    monitorLoading: false,
+    monitorData: {},   // address → records[]
+
+    // Discovery
+    discovered: [],
+    knownDevices: [],
+    discovering: false,
+    scanDone: false,
+    scanTimeout: 10,
+    scanElapsed: 0,
+    scanProgress: 0,
+    _scanEs: null,
+
+    // Per-device BLE busy state: { address: 'message' }
+    busyDevices: {},
+    debugMode: false,
+    autoPoll: true,
+
+    // Assign discovered device modal
+    showAssignModal: false,
+    assignDevice: null,
+    assignTargetAddress: '',
+    assignMsg: '',
+
+    // Set Temp modal
+    showSetTemp: false,
+    tempLoading: false,
+    tempSaving: false,
+    selectedDevice: null,
+    tempForm: {comfort: '', eco: '', offset: '', child_lock: false},
+    tempMsg: '',
+
+    // Schedule modal
+    showSchedule: false,
+    scheduleLoading: false,
+    scheduleSaving: false,
+    scheduleMsg: '',
+    scheduleForm: null,
+
+    // PIN modal
+    showPinPrompt: false,
+    pinPromptForm: {pin: ''},
+    pinPromptMsg: '',
+    pinPromptTesting: false,
+    _pendingTempOpen: false,
+
+    // Rename modal
+    showRename: false,
+    renameDevice: null,
+    renameForm: {name: '', mac_address: ''},
+    renameMsg: '',
+
+    // Add Device modal
+    showAddDevice: false,
+    addForm: {address: '', name: '', pin: ''},
+    addMsg: '',
+
+    // Profile modal
+    showProfileModal: false,
+    profileEditMode: false,
+    profileForm: {name: '', comfort_temp: '', eco_temp: ''},
+    profileScheduleForm: [],
+    profileWeekPeriods: [],
+    profileWeekendPeriods: [],
+    profileSchedTab: 'week',
+    profileMsg: '',
+
+    pollingDevices: {},
+    pollingAll: false,
+    showApplyProfile: false,
+    applyProfileName: '',
+    applyProfileTargets: [],
+    applyProfileMsg: '',
+    applyProfileApplying: false,
+    toast: '',
+
+    // ─────────────────────────────────────────────────────────────
+
+    async init() {
+      // Restore page from localStorage but validate it's a known tab
+      const saved = localStorage.getItem('cb_page');
+      if (saved && ['dashboard','monitor','devices','profiles','discovery'].includes(saved)) {
+        this.page = saved;
+        this.onPageChange(saved);
+      }
+      await this.loadDevices();
+      await this.loadProfiles();
+      await this.loadStatus();
+      setInterval(() => this.loadDevices(), 30000);
+    },
+
+    onPageChange(tab) {
+      if (tab === 'discovery') this.loadKnownDevices();
+      if (tab === 'monitor')   this.loadMonitor();
+    },
+
+    async loadDevices() {
+      const devs = await fetch(`${API}/api/devices`).then(r => r.json()).catch(() => []);
+      for (const d of devs) {
+        d.status = await fetch(`${API}/api/devices/${d.address}/status`).then(r => r.json()).catch(() => null);
+      }
+      this.devices = devs;
+      this.computeAlerts();
+    },
+
+    computeAlerts() {
+      const alerts = [];
+      for (const d of this.devices) {
+        const name = d.name || d.address.substring(0, 8);
+        const s = d.status || {};
+        const battery = s.battery;
+        // Battery alerts
+        if (battery !== null && battery !== undefined && battery !== 255) {
+          if (battery <= 10) alerts.push({id: `${d.address}_bat_crit`, level: 'error', msg: `${name}: Batterie kritisch (${battery}%)`});
+          else if (battery <= 20) alerts.push({id: `${d.address}_bat_low`, level: 'warn', msg: `${name}: Batterie schwach (${battery}%)`});
+        }
+        // Device error / offline
+        if (s.error) {
+          const isAuth = s.error.includes('auth');
+          const msg = isAuth ? `${name}: Authentifizierung fehlgeschlagen (PIN prüfen)` : `${name}: Verbindungsfehler`;
+          alerts.push({id: `${d.address}_err`, level: isAuth ? 'error' : 'warn', msg});
+        }
+        // Not polled yet
+        if (!s.polled_at && d.added_at) {
+          alerts.push({id: `${d.address}_nopoll`, level: 'info', msg: `${name}: Noch kein Poll — bitte Poll auslösen`});
+        }
+      }
+      this.alerts = alerts;
+    },
+
+    async loadProfiles() {
+      const list = await fetch(`${API}/api/profiles`).then(r => r.json()).catch(() => []);
+      const full = [];
+      for (const p of list) {
+        const data = await fetch(`${API}/api/profiles/${p.name}`).then(r => r.json()).catch(() => null);
+        if (data) full.push(data);
+      }
+      this.profiles = full;
+    },
+
+    async loadStatus() {
+      this.status = await fetch(`${API}/api/status`).then(r => r.json()).catch(() => ({}));
+      if (typeof this.status.auto_poll === 'boolean') this.autoPoll = this.status.auto_poll;
+    },
+
+    async toggleAutoPoll() {
+      this.autoPoll = !this.autoPoll;
+      await fetch(`${API}/api/settings/auto_poll`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled: this.autoPoll}),
+      });
+    },
+
+    // ── Monitor ─────────────────────────────────────────────────
+
+    async loadMonitor() {
+      this.monitorLoading = true;
+      // Destroy existing charts
+      Object.keys(_charts).forEach(id => destroyChart(id));
+
+      const all = await fetch(`${API}/api/history?hours=${this.monitorHours}&limit=2000`)
+        .then(r => r.json()).catch(() => []);
+
+      this.monitorData = {};
+      for (const entry of all) {
+        this.monitorData[entry.address] = entry.records;
+      }
+
+      this.monitorLoading = false;
+
+      // Draw charts after Alpine renders the canvases
+      await this.$nextTick();
+      for (const dev of this.devices) {
+        const records = this.monitorData[dev.address] || [];
+        drawChart('chart-' + dev.address, records, dev.name);
+      }
+    },
+
+    // ── Discovery ────────────────────────────────────────────────
+
+    async loadKnownDevices() {
+      this.knownDevices = await fetch(`${API}/api/discovery/known`).then(r => r.json()).catch(() => []);
+    },
+
+    runDiscovery() {
+      if (this.discovering) return;
+      if (this._scanEs) { this._scanEs.close(); this._scanEs = null; }
+
+      this.discovering = true;
+      this.scanDone = false;
+      this.discovered = [];
+      this.scanElapsed = 0;
+      this.scanProgress = 0;
+
+      const es = new EventSource(`${API}/api/discovery/stream?timeout=${this.scanTimeout}`);
+      this._scanEs = es;
+
+      es.addEventListener('device', (e) => {
+        const d = JSON.parse(e.data);
+        if (!this.discovered.find(x => x.address === d.address)) {
+          this.discovered.push(d);
+        }
+        // Update known list live
+        const known = this.knownDevices.find(k => k.address === d.address);
+        if (known) { known.last_seen = new Date().toISOString(); }
+        else { this.knownDevices.unshift({...d, configured: this.isConfigured(d.address), last_seen: new Date().toISOString(), first_seen: new Date().toISOString()}); }
+      });
+
+      es.addEventListener('progress', (e) => {
+        const {elapsed, total} = JSON.parse(e.data);
+        this.scanElapsed = elapsed;
+        this.scanProgress = Math.min(100, (elapsed / total) * 100);
+      });
+
+      es.addEventListener('done', () => {
+        es.close(); this._scanEs = null;
+        this.discovering = false;
+        this.scanDone = true;
+        this.scanProgress = 100;
+        this.loadDevices(); // Refresh RSSI + status on dashboard
+      });
+
+      es.onerror = () => {
+        es.close(); this._scanEs = null;
+        this.discovering = false;
+        this.scanDone = true;
+        if (!this.discovered.length) this.showToast('Scan error — check Bluetooth.');
+      };
+    },
+
+    isConfigured(address) {
+      return this.devices.some(d => d.address.toUpperCase() === address.toUpperCase());
+    },
+
+    async addDiscoveredDirect(d) {
+      // Add directly without extra modal (name pre-filled from scan result)
+      // Default PIN is 0 (CometBlue factory default = 000000)
+      const body = {address: d.address, name: d.name || d.address, pin: 0};
+      const res = await fetch(`${API}/api/devices`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        await this.loadDevices();
+        // Mark as configured in known list
+        const known = this.knownDevices.find(k => k.address === d.address);
+        if (known) known.configured = true;
+        // Mark in scan results
+        const found = this.discovered.find(x => x.address === d.address);
+        if (found) found._added = true;
+        this.showToast(`${d.name} added!`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        this.showToast('Error: ' + (err.detail || 'Could not add device'));
+      }
+    },
+
+    // ── Set Temperature ──────────────────────────────────────────
+
+    async openSetTemp(dev) {
+      this.selectedDevice = dev;
+      this.tempMsg = '';
+      this.tempSaving = false;
+      this.tempForm = {comfort: '', eco: '', offset: '', child_lock: dev.status?.child_lock ?? false};
+      this._bleLock('Verbindung wird geprüft…', dev.address);
+
+      if (dev.pin != null) {
+        const valid = await this._testStoredPin(dev.address);
+        if (!valid) {
+          this._bleUnlock(dev.address);
+          this._pendingTempOpen = true;
+          this._openPinPrompt();
+          return;
+        }
+      }
+      this.showSetTemp = true;
+      this.tempLoading = true;
+      await this._loadTempForm(dev.address);  // handles its own lock/unlock
+      this.tempLoading = false;
+    },
+
+    async _testStoredPin(address) {
+      const res = await fetch(`${API}/api/devices/${address}/test-pin`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}),
+      }).then(r => r.json()).catch(() => null);
+      return res?.valid ?? true;
+    },
+
+    async _loadTempForm(address) {
+      this._bleLock('Temperaturen werden geladen…', address);
+      const data = await fetch(`${API}/api/devices/${address}/temperatures`).then(r => r.json()).catch(() => null);
+      this._bleUnlock(address);
+      const dev = this.devices.find(d => d.address === address);
+      if (data?.temperatures) {
+        this.tempForm = {
+          comfort: data.temperatures.comfort ?? '',
+          eco: data.temperatures.eco ?? '',
+          offset: data.temperatures.offset ?? '',
+          child_lock: dev?.status?.child_lock ?? false,
+        };
+      } else {
+        this.tempForm = {
+          comfort: dev?.status?.temp_comfort ?? '',
+          eco: dev?.status?.temp_eco ?? '',
+          offset: dev?.status?.temp_offset ?? '',
+          child_lock: dev?.status?.child_lock ?? false,
+        };
+      }
+    },
+
+    async submitSetTemp() {
+      this.tempMsg = '';
+      this.tempSaving = true;
+      const addr = this.selectedDevice.address;
+      this._bleLock('Temperaturen werden gespeichert…', addr);
+      const body = {};
+      if (this.tempForm.comfort !== '') body.comfort = parseFloat(this.tempForm.comfort);
+      if (this.tempForm.eco     !== '') body.eco     = parseFloat(this.tempForm.eco);
+      if (this.tempForm.offset  !== '') body.offset  = parseFloat(this.tempForm.offset);
+      const res = await fetch(`${API}/api/devices/${addr}/temperatures`, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+      });
+      // Also update child_lock if changed
+      const origLock = this.devices.find(d => d.address === addr)?.status?.child_lock ?? false;
+      if (res.ok && this.tempForm.child_lock !== origLock) {
+        this._bleLock('Kindersicherung wird gesetzt…', addr);
+        await fetch(`${API}/api/devices/${addr}/flags`, {
+          method: 'PATCH', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({child_lock: this.tempForm.child_lock}),
+        });
+      }
+      this._bleUnlock(addr);
+      this.tempSaving = false;
+      if (res.ok) {
+        this.tempMsg = '✓ Gespeichert';
+        await this.loadDevices();
+        setTimeout(() => { this.showSetTemp = false; this.tempMsg = ''; }, 1500);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        const detail = err.detail || res.statusText;
+        this.tempMsg = 'Error: ' + detail;
+        if (detail.toLowerCase().includes('ble') || detail.toLowerCase().includes('auth')) {
+          this.showSetTemp = false;
+          this._pendingTempOpen = true;
+          this._openPinPrompt();
+        }
+      }
+    },
+
+    // ── Schedule ─────────────────────────────────────────────────
+
+    _emptyScheduleForm() {
+      return [
+        {day: 'monday',    label: 'Montag'},
+        {day: 'tuesday',   label: 'Dienstag'},
+        {day: 'wednesday', label: 'Mittwoch'},
+        {day: 'thursday',  label: 'Donnerstag'},
+        {day: 'friday',    label: 'Freitag'},
+        {day: 'saturday',  label: 'Samstag'},
+        {day: 'sunday',    label: 'Sonntag'},
+      ].map(d => ({...d, periods: [{start:'',end:''},{start:'',end:''},{start:'',end:''},{start:'',end:''}]}));
+    },
+
+    async openSchedule(dev) {
+      this.selectedDevice = dev;
+      this.showSchedule = true;
+      this.scheduleLoading = true;
+      this.scheduleMsg = '';
+      this.scheduleForm = this._emptyScheduleForm();
+      this._bleLock('Heizzeiten werden geladen…', dev.address);
+
+      const data = await fetch(`${API}/api/devices/${dev.address}/schedules`)
+        .then(r => r.json()).catch(() => null);
+      this._bleUnlock(dev.address);
+
+      if (Array.isArray(data)) {
+        for (const day of data) {
+          const row = this.scheduleForm.find(r => r.day === day.day);
+          if (!row) continue;
+          const filled = day.periods
+            .filter(p => p.start || p.end)
+            .map(p => ({start: p.start || '', end: p.end || ''}));
+          while (filled.length < 4) filled.push({start: '', end: ''});
+          row.periods = filled;
+        }
+      } else if (data?.detail) {
+        this.scheduleMsg = 'Error: ' + data.detail;
+      }
+      this.scheduleLoading = false;
+    },
+
+    validTime(t) {
+      if (!t) return true;
+      const [h, m] = t.split(':').map(Number);
+      return m % 10 === 0;
+    },
+
+    async submitSchedule() {
+      // Validate: all minutes must be multiples of 10
+      for (const row of this.scheduleForm) {
+        for (const p of row.periods) {
+          if ((p.start && !this.validTime(p.start)) || (p.end && !this.validTime(p.end))) {
+            this.scheduleMsg = 'Fehler: Zeiten müssen in 10-Minuten-Schritten sein (z.B. 06:00, 12:10, 17:30)';
+            return;
+          }
+        }
+      }
+      this.scheduleSaving = true;
+      this.scheduleMsg = '';
+      const schedAddr = this.selectedDevice.address;
+      this._bleLock('Heizzeiten werden gespeichert…', schedAddr);
+      const body = {};
+      for (const row of this.scheduleForm) {
+        body[row.day] = row.periods.filter(p => p.start && p.end);
+      }
+      const res = await fetch(`${API}/api/devices/${schedAddr}/schedules`, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+      }).then(r => r.json()).catch(() => null);
+      this._bleUnlock(schedAddr);
+      this.scheduleSaving = false;
+      if (res?.status === 'ok') {
+        this.scheduleMsg = '✓ Heizzeiten gespeichert';
+        setTimeout(() => { this.showSchedule = false; this.scheduleMsg = ''; }, 1500);
+      } else {
+        this.scheduleMsg = 'Error: ' + (res?.detail || 'Unbekannter Fehler');
+      }
+    },
+
+    // ── PIN ──────────────────────────────────────────────────────
+
+    openFixPin(dev) {
+      this.selectedDevice = dev;
+      this._pendingTempOpen = false;
+      this._openPinPrompt();
+    },
+
+    _openPinPrompt() {
+      this.pinPromptForm = {pin: ''}; this.pinPromptMsg = ''; this.pinPromptTesting = false;
+      this.showPinPrompt = true;
+    },
+
+    async submitPinPrompt() {
+      if (this.pinPromptForm.pin === '') { this.pinPromptMsg = 'Bitte PIN eingeben.'; return; }
+      this.pinPromptMsg = ''; this.pinPromptTesting = true;
+      const pinAddr = this.selectedDevice.address;
+      this._bleLock('PIN wird geprüft…', pinAddr);
+      const pin = parseInt(this.pinPromptForm.pin);
+      const raw = await fetch(`${API}/api/devices/${pinAddr}/test-pin`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({pin}),
+      }).catch(() => null);
+      this._bleUnlock(pinAddr);
+      this.pinPromptTesting = false;
+      if (!raw) { this.pinPromptMsg = 'Verbindungsfehler. Gerät erreichbar?'; return; }
+      if (!raw.ok && raw.status !== 200) {
+        const err = await raw.json().catch(() => ({}));
+        this.pinPromptMsg = 'BLE-Fehler: ' + (err.detail || raw.statusText);
+        return;
+      }
+      const res = await raw.json().catch(() => null);
+      if (res?.valid) {
+        await fetch(`${API}/api/devices/${this.selectedDevice.address}`, {
+          method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({pin}),
+        });
+        this.selectedDevice.pin = pin;
+        this.showPinPrompt = false;
+        if (this._pendingTempOpen) {
+          this._pendingTempOpen = false;
+          this.showSetTemp = true; this.tempLoading = true; this.tempMsg = '';
+          await this._loadTempForm(this.selectedDevice.address);
+          this.tempLoading = false;
+        }
+        await this.loadDevices();
+        this.showToast('PIN gespeichert.');
+      } else {
+        this.pinPromptMsg = 'PIN falsch. Bitte erneut versuchen.';
+      }
+    },
+
+    // ── Rename ───────────────────────────────────────────────────
+
+    openRename(dev) {
+      this.renameDevice = dev;
+      this.renameForm = {name: dev.name || '', pin: ''};
+      this.renameMsg = '';
+      this.showRename = true;
+    },
+
+    async submitRename() {
+      this.renameMsg = '';
+      const name = this.renameForm.name.trim();
+      if (!name) { this.renameMsg = 'Name darf nicht leer sein.'; return; }
+      const body = {name};
+      if (this.renameForm.pin !== '') body.pin = parseInt(this.renameForm.pin);
+      const res = await fetch(`${API}/api/devices/${this.renameDevice.address}`, {
+        method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        this.renameMsg = '✓ Gespeichert';
+        await this.loadDevices();
+        setTimeout(() => { this.showRename = false; this.renameMsg = ''; }, 800);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        this.renameMsg = 'Error: ' + (err.detail || res.statusText);
+      }
+    },
+
+    async savePinWithoutTest() {
+      if (this.pinPromptForm.pin === '') { this.pinPromptMsg = 'Bitte PIN eingeben.'; return; }
+      const pin = parseInt(this.pinPromptForm.pin);
+      await fetch(`${API}/api/devices/${this.selectedDevice.address}`, {
+        method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({pin}),
+      });
+      this.selectedDevice.pin = pin;
+      this.showPinPrompt = false;
+      await this.loadDevices();
+      this.showToast('PIN gespeichert (ohne Test).');
+    },
+
+    async resetDeviceData(address) {
+      if (!confirm('Verlauf und gecachten Status für dieses Gerät löschen?\nGerätekonfiguration (Name, PIN, MAC) bleibt erhalten.')) return;
+      await fetch(`${API}/api/devices/${address}/reset`, {method: 'POST'});
+      this.showRename = false;
+      await this.loadDevices();
+      this.showToast('Daten zurückgesetzt.');
+    },
+
+    // ── Add Device ───────────────────────────────────────────────
+
+    async submitAddDevice() {
+      this.addMsg = '';
+      if (!this.addForm.address) { this.addMsg = 'Address is required'; return; }
+      const body = {address: this.addForm.address, name: this.addForm.name || this.addForm.address, pin: this.addForm.pin ? parseInt(this.addForm.pin) : null};
+      const res = await fetch(`${API}/api/devices`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+      if (res.ok) {
+        this.showAddDevice = false; this.addForm = {address: '', name: '', pin: ''};
+        await this.loadDevices(); this.showToast('Device added!');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        this.addMsg = 'Error: ' + (err.detail || res.statusText);
+      }
+    },
+
+    async removeDevice(address) {
+      if (!confirm('Remove device ' + address + '?')) return;
+      await fetch(`${API}/api/devices/${address}`, {method: 'DELETE'});
+      await this.loadDevices(); this.showToast('Device removed');
+    },
+
+    openAssignModal(discoveredDevice) {
+      this.assignDevice = discoveredDevice;
+      this.assignTargetAddress = '';
+      this.assignMsg = '';
+      this.showAssignModal = true;
+    },
+
+    async submitAssign() {
+      if (!this.assignTargetAddress || !this.assignDevice) return;
+      this.assignMsg = '';
+      const res = await fetch(`${API}/api/devices/${this.assignTargetAddress}/assign-address`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({new_address: this.assignDevice.address}),
+      }).then(r => r.json()).catch(() => null);
+      if (res?.status === 'ok') {
+        this.assignMsg = `✓ UUID aktualisiert → ${res.new_address}`;
+        await this.loadDevices();
+        setTimeout(() => { this.showAssignModal = false; this.assignMsg = ''; }, 1500);
+      } else {
+        this.assignMsg = 'Fehler: ' + (res?.detail || JSON.stringify(res));
+      }
+    },
+
+    async rediscoverDevice(dev) {
+      this._bleLock('Suche Gerät per MAC…', dev.address);
+      const res = await fetch(`${API}/api/devices/${dev.address}/rediscover`, {method: 'POST'})
+        .then(r => r.json()).catch(() => null);
+      this._bleUnlock(dev.address);
+      if (!res) { this.showToast('Fehler beim Suchen'); return; }
+      if (res.status === 'updated') {
+        this.showToast(`UUID aktualisiert: ${res.new_address}`);
+        await this.loadDevices();
+      } else if (res.status === 'unchanged') {
+        this.showToast('Gerät gefunden — UUID unverändert');
+        await this.loadDevices();
+      } else {
+        this.showToast('Gerät nicht gefunden: ' + (res.detail || JSON.stringify(res)));
+      }
+    },
+
+    async pollAll() {
+      if (this.pollingAll) return;
+      this.pollingAll = true;
+      try {
+        await Promise.all(this.devices.map(d =>
+          fetch(`${API}/api/devices/${d.address}/poll`, {method: 'POST'}).catch(() => null)
+        ));
+        await this.loadDevices();
+        this.showToast('Alle Geräte abgefragt.');
+      } finally {
+        this.pollingAll = false;
+      }
+    },
+
+    async pollDevice(address) {
+      if (this.pollingDevices[address] || this.busyDevices[address]) return;
+      this.pollingDevices[address] = true;
+      this._bleLock('Gerät wird abgefragt…', address);
+      try {
+        await fetch(`${API}/api/devices/${address}/poll`, {method: 'POST'});
+        await this.loadDevices();
+        this.showToast('Poll abgeschlossen');
+      } finally {
+        this._bleUnlock(address);
+        delete this.pollingDevices[address];
+      }
+    },
+
+    // ── Profiles ─────────────────────────────────────────────────
+
+    _emptyProfileScheduleForm() {
+      return [
+        {day: 'monday',    label: 'Montag'},
+        {day: 'tuesday',   label: 'Dienstag'},
+        {day: 'wednesday', label: 'Mittwoch'},
+        {day: 'thursday',  label: 'Donnerstag'},
+        {day: 'friday',    label: 'Freitag'},
+        {day: 'saturday',  label: 'Samstag'},
+        {day: 'sunday',    label: 'Sonntag'},
+      ].map(d => ({...d, periods: [{start:'',end:''},{start:'',end:''},{start:'',end:''},{start:'',end:''}]}));
+    },
+
+    _emptyPeriods() {
+      return [{start:'',end:''},{start:'',end:''},{start:'',end:''},{start:'',end:''}];
+    },
+
+    _periodsFromDay(schedules, day) {
+      const raw = (schedules || {})[day] || [];
+      const filled = raw.filter(p => p.start || p.end).map(p => ({start: p.start||'', end: p.end||''}));
+      while (filled.length < 4) filled.push({start:'', end:''});
+      return filled;
+    },
+
+    profileDayLabel(day) {
+      const map = {monday:'Mo',tuesday:'Di',wednesday:'Mi',thursday:'Do',friday:'Fr',saturday:'Sa',sunday:'So'};
+      return map[day] || day;
+    },
+
+    applyWeekToSchedule() {
+      const days = ['monday','tuesday','wednesday','thursday','friday'];
+      for (const row of this.profileScheduleForm) {
+        if (days.includes(row.day)) {
+          row.periods = this.profileWeekPeriods.map(p => ({...p}));
+        }
+      }
+      this.profileSchedTab = 'individual';
+    },
+
+    applyWeekendToSchedule() {
+      for (const row of this.profileScheduleForm) {
+        if (row.day === 'saturday' || row.day === 'sunday') {
+          row.periods = this.profileWeekendPeriods.map(p => ({...p}));
+        }
+      }
+      this.profileSchedTab = 'individual';
+    },
+
+    openNewProfile() {
+      this.profileEditMode = false;
+      this.profileForm = {name: '', comfort_temp: '', eco_temp: ''};
+      this.profileScheduleForm = this._emptyProfileScheduleForm();
+      this.profileWeekPeriods = this._emptyPeriods();
+      this.profileWeekendPeriods = this._emptyPeriods();
+      this.profileSchedTab = 'week';
+      this.profileMsg = '';
+      this.showProfileModal = true;
+    },
+
+    openEditProfile(p) {
+      this.profileEditMode = true;
+      this.profileForm = {
+        name: p.name,
+        comfort_temp: p.comfort_temp ?? '',
+        eco_temp:     p.eco_temp     ?? '',
+      };
+      this.profileScheduleForm = this._emptyProfileScheduleForm();
+      if (p.schedules) {
+        for (const row of this.profileScheduleForm) {
+          row.periods = this._periodsFromDay(p.schedules, row.day);
+        }
+      }
+      // Pre-fill shortcut forms from Monday (week) and Saturday (weekend)
+      this.profileWeekPeriods = this._periodsFromDay(p.schedules, 'monday');
+      this.profileWeekendPeriods = this._periodsFromDay(p.schedules, 'saturday');
+      this.profileSchedTab = 'week';
+      this.profileMsg = '';
+      this.showProfileModal = true;
+    },
+
+    async submitProfileModal() {
+      this.profileMsg = '';
+      const name = this.profileForm.name.trim();
+      if (!name) { this.profileMsg = 'Fehler: Name erforderlich.'; return; }
+      const body = {name};
+      if (this.profileForm.comfort_temp !== '') body.comfort_temp = parseFloat(this.profileForm.comfort_temp);
+      if (this.profileForm.eco_temp     !== '') body.eco_temp     = parseFloat(this.profileForm.eco_temp);
+      // If week or weekend tab is active, apply shortcut data to individual form first
+      if (this.profileSchedTab === 'week') this.applyWeekToSchedule();
+      else if (this.profileSchedTab === 'weekend') this.applyWeekendToSchedule();
+      // Build schedules from the 7-day individual form
+      const schedules = {};
+      for (const row of this.profileScheduleForm) {
+        const active = row.periods.filter(p => p.start && p.end);
+        if (active.length > 0) schedules[row.day] = active;
+      }
+      if (Object.keys(schedules).length > 0) body.schedules = schedules;
+      const res = await fetch(`${API}/api/profiles/${encodeURIComponent(name)}`, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        this.profileMsg = '✓ Gespeichert';
+        await this.loadProfiles();
+        setTimeout(() => { this.showProfileModal = false; this.profileMsg = ''; }, 800);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        this.profileMsg = 'Fehler: ' + (err.detail || res.statusText);
+      }
+    },
+
+    async deleteProfile(name) {
+      if (!confirm(`Profil "${name}" löschen?`)) return;
+      const res = await fetch(`${API}/api/profiles/${encodeURIComponent(name)}`, {method: 'DELETE'});
+      if (res.ok) {
+        this.showProfileModal = false;
+        await this.loadProfiles();
+        this.showToast(`Profil "${name}" gelöscht`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        this.profileMsg = 'Error: ' + (err.detail || res.statusText);
+      }
+    },
+
+    openApplyProfile(name) {
+      this.applyProfileName = name;
+      this.applyProfileTargets = this.devices.map(d => d.address); // alle vorauswählen
+      this.applyProfileMsg = '';
+      this.applyProfileApplying = false;
+      this.showApplyProfile = true;
+    },
+
+    async submitApplyProfile() {
+      if (!this.applyProfileTargets.length) return;
+      this.applyProfileApplying = true;
+      this.applyProfileMsg = '';
+      const res = await fetch(`${API}/api/profiles/${this.applyProfileName}/apply`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({devices: this.applyProfileTargets, apply_schedules: true}),
+      }).catch(() => null);
+      this.applyProfileApplying = false;
+      if (!res?.ok) {
+        this.applyProfileMsg = 'Fehler beim Anwenden.';
+        return;
+      }
+      const result = await res.json().catch(() => ({}));
+      const results = result.results || {};
+      const errors = Object.entries(results).filter(([,v]) => v !== 'ok');
+      if (errors.length) {
+        const names = errors.map(([addr, err]) => {
+          const dev = this.devices.find(d => d.address.toUpperCase() === addr.toUpperCase());
+          return `${dev?.name || addr.substring(0,8)}: ${err}`;
+        });
+        this.applyProfileMsg = 'Fehler bei: ' + names.join(', ');
+      } else {
+        this.applyProfileMsg = `✓ Auf ${this.applyProfileTargets.length} Gerät(e) angewendet`;
+        await this.loadDevices();
+        setTimeout(() => { this.showApplyProfile = false; this.applyProfileMsg = ''; }, 1200);
+      }
+    },
+
+    // ── BLE busy helpers ─────────────────────────────────────────
+
+    _bleLock(msg, address) {
+      if (address) this.busyDevices = {...this.busyDevices, [address]: msg || 'BLE…'};
+    },
+    _bleUnlock(address) {
+      if (address) { const d = {...this.busyDevices}; delete d[address]; this.busyDevices = d; }
+    },
+
+    // ── Helpers ──────────────────────────────────────────────────
+
+    fmt(v) { return v != null ? v.toFixed(1) : '—'; },
+    fmtTime(iso) { if (!iso) return ''; return new Date(iso).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}); },
+    fmtDate(iso) { if (!iso) return ''; return new Date(iso).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'}); },
+    // Detect address format: MAC (AA:BB:CC:DD:EE:FF) vs CoreBluetooth UUID (macOS)
+    fmtAddr(addr) {
+      if (!addr) return '—';
+      // MAC format: 6 groups of 2 hex chars separated by colons
+      if (/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(addr)) return addr;
+      // CoreBluetooth UUID (macOS): show shortened first 8 chars + note
+      return addr.substring(0, 8).toUpperCase() + '… (macOS UUID)';
+    },
+    showToast(msg) { this.toast = msg; setTimeout(() => { this.toast = ''; }, 3000); },
+  };
+}
+</script>
+</body>
+</html>

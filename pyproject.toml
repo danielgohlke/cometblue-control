@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cometblue-control"
+version = "0.1.0"
+description = "Cross-platform control system for CometBlue BLE radiator thermostats"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "bleak>=0.21",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "apscheduler>=3.10",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "aiosqlite>=0.20",
+    "click>=8.1",
+]
+
+[project.optional-dependencies]
+mcp = [
+    "mcp>=1.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+cometblue-control = "cometblue.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cometblue*"]
+
+[tool.setuptools.package-data]
+"cometblue" = ["py.typed"]

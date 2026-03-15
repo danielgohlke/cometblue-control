@@ -1,0 +1,13 @@
+name: Holiday
+comfort_temp: 16.0
+eco_temp: 14.0
+manual_temp: 15.0
+# Minimal heating while away — flat schedule
+schedules:
+  monday:    []
+  tuesday:   []
+  wednesday: []
+  thursday:  []
+  friday:    []
+  saturday:  []
+  sunday:    []
