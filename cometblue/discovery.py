@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from asyncio import Queue
 from dataclasses import dataclass
 from typing import AsyncGenerator, Optional, Tuple
@@ -18,8 +19,26 @@ from .protocol import (
 
 log = logging.getLogger(__name__)
 
+IS_MACOS = sys.platform == "darwin"
+
 SCAN_TIMEOUT = 10.0
 VERIFY_TIMEOUT = 8.0
+
+
+def _scanner_kwargs(adapter: Optional[str] = None) -> dict:
+    """Build BleakScanner kwargs — omits 'adapter' on macOS (not supported)."""
+    kwargs: dict = {}
+    if adapter and not IS_MACOS:
+        kwargs["adapter"] = adapter
+    return kwargs
+
+
+def _client_kwargs(adapter: Optional[str] = None, timeout: float = VERIFY_TIMEOUT) -> dict:
+    """Build BleakClient kwargs — omits 'adapter' on macOS (not supported)."""
+    kwargs: dict = {"timeout": timeout}
+    if adapter and not IS_MACOS:
+        kwargs["adapter"] = adapter
+    return kwargs
 
 
 @dataclass
@@ -38,11 +57,10 @@ async def scan(timeout: float = SCAN_TIMEOUT, adapter: Optional[str] = None) -> 
     First pass: name-based filter ("Comet Blue").
     Second pass: GATT verification of manufacturer + model (best-effort).
     """
-    log.info("Starting BLE scan (%.1fs)...", timeout)
+    log.info("Starting BLE scan (%.1fs) [platform=%s]...", timeout, sys.platform)
 
-    kwargs = {"timeout": timeout}
-    if adapter:
-        kwargs["adapter"] = adapter
+    kwargs = _scanner_kwargs(adapter)
+    kwargs["timeout"] = timeout
 
     devices = await BleakScanner.discover(**kwargs)
 
@@ -95,10 +113,7 @@ async def scan_streaming(
             queue.put_nowait(DiscoveredDevice(address=device.address, name=name, rssi=rssi))
             log.debug("Streaming candidate: %s (%s)", name, device.address)
 
-    kwargs: dict = {}
-    if adapter:
-        kwargs["adapter"] = adapter
-
+    kwargs = _scanner_kwargs(adapter)
     scanner = BleakScanner(detection_callback=_on_device, **kwargs)
     await scanner.start()
     log.info("Streaming BLE scan started (%.1fs)", timeout)
@@ -139,20 +154,17 @@ async def find_by_mac(mac: str, timeout: float = SCAN_TIMEOUT,
     mac_upper = mac.upper()
     log.info("Scanning for device with MAC %s (pin=%s)...", mac_upper, "yes" if pin is not None else "no")
 
-    kwargs = {"timeout": timeout}
-    if adapter:
-        kwargs["adapter"] = adapter
+    skwargs = _scanner_kwargs(adapter)
+    skwargs["timeout"] = timeout
 
-    devices = await BleakScanner.discover(**kwargs)
+    devices = await BleakScanner.discover(**skwargs)
     for d in devices:
         name = (d.name or "").strip()
         if "comet" not in name.lower() and "blue" not in name.lower():
             continue
         # Connect, optionally authenticate, then check System ID
         try:
-            ckwargs = {"timeout": VERIFY_TIMEOUT}
-            if adapter:
-                ckwargs["adapter"] = adapter
+            ckwargs = _client_kwargs(adapter, timeout=VERIFY_TIMEOUT)
             async with BleakClient(d.address, **ckwargs) as client:
                 if pin is not None:
                     pin_data = encode_pin(pin)
@@ -183,9 +195,7 @@ async def _verify_device(address: str, adapter: Optional[str] = None) -> Tuple[b
     Returns (verified, mac_address).
     """
     try:
-        kwargs = {"timeout": VERIFY_TIMEOUT}
-        if adapter:
-            kwargs["adapter"] = adapter
+        kwargs = _client_kwargs(adapter, timeout=VERIFY_TIMEOUT)
         async with BleakClient(address, **kwargs) as client:
             manufacturer = ""
             model = ""
