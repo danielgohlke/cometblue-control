@@ -34,6 +34,13 @@ if [ "$(uname)" != "Linux" ]; then
   exit 1
 fi
 
+# Verify source files are present
+if [ ! -f "$SCRIPT_DIR/pyproject.toml" ]; then
+  echo "ERROR: pyproject.toml not found in $SCRIPT_DIR" >&2
+  echo "       Run this script from the cloned cometblue-control directory." >&2
+  exit 1
+fi
+
 # System packages
 echo "==> Installing system packages..."
 sudo apt-get update -qq
@@ -77,31 +84,32 @@ fi
 # Check Python
 PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 echo "    Python: $PY_VERSION"
-if python3 -c 'import sys; exit(0 if sys.version_info >= (3,10) else 1)' 2>/dev/null; then
-  : # ok
-else
+if ! python3 -c 'import sys; exit(0 if sys.version_info >= (3,10) else 1)' 2>/dev/null; then
   echo "ERROR: Python 3.10+ required. On older Pi OS, use:"
   echo "  sudo apt install python3.11 python3.11-venv"
   exit 1
 fi
 
-# Install files
+# Copy files
 echo "==> Installing to $INSTALL_DIR..."
 sudo mkdir -p "$INSTALL_DIR"
 sudo cp -r "$SCRIPT_DIR/." "$INSTALL_DIR/"
+sudo rm -rf "$INSTALL_DIR/.venv" "$INSTALL_DIR/.git"
 sudo chown -R "$SERVICE_USER" "$INSTALL_DIR"
+echo "    Files copied."
 
 # venv
 echo "==> Creating virtual environment..."
 python3 -m venv "$INSTALL_DIR/.venv"
 source "$INSTALL_DIR/.venv/bin/activate"
-pip install --upgrade pip -q
+
+pip install --upgrade pip
 
 if [ $WITH_MCP -eq 1 ]; then
-  pip install -e "$INSTALL_DIR[mcp]" -q
+  pip install -e "$INSTALL_DIR[mcp]"
   echo "    Installed with MCP support"
 else
-  pip install -e "$INSTALL_DIR" -q
+  pip install -e "$INSTALL_DIR"
   echo "    Installed (core + API + UI)"
 fi
 

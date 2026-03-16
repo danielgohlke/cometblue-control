@@ -5,7 +5,8 @@ set -e
 
 WITH_MCP=0
 SETUP_LAUNCHD=0
-INSTALL_DIR="$HOME/Library/Application Support/cometblue-control"
+# No spaces in path — pip extras syntax "path[extra]" breaks with spaces
+INSTALL_DIR="$HOME/.cometblue-control"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 for arg in "$@"; do
@@ -29,6 +30,13 @@ if [ "$(uname)" != "Darwin" ]; then
   exit 1
 fi
 
+# Verify source files are present
+if [ ! -f "$SCRIPT_DIR/pyproject.toml" ]; then
+  echo "ERROR: pyproject.toml not found in $SCRIPT_DIR" >&2
+  echo "       Run this script from the cloned cometblue-control directory." >&2
+  exit 1
+fi
+
 # Check Python
 if ! command -v python3 &>/dev/null; then
   echo "ERROR: python3 not found."
@@ -46,22 +54,25 @@ if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }
   exit 1
 fi
 
-# Copy to install dir
+# Copy to install dir (exclude .venv and .git — they are recreated/irrelevant)
 echo "==> Installing to: $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 cp -r "$SCRIPT_DIR/." "$INSTALL_DIR/"
+rm -rf "$INSTALL_DIR/.venv" "$INSTALL_DIR/.git"
+echo "    Files copied."
 
 # Create venv
 echo "==> Creating virtual environment..."
 python3 -m venv "$INSTALL_DIR/.venv"
 source "$INSTALL_DIR/.venv/bin/activate"
 
-pip install --upgrade pip -q
+pip install --upgrade pip
+
 if [ $WITH_MCP -eq 1 ]; then
-  pip install -e "$INSTALL_DIR[mcp]" -q
+  pip install -e "$INSTALL_DIR[mcp]"
   echo "    Installed with MCP support"
 else
-  pip install -e "$INSTALL_DIR" -q
+  pip install -e "$INSTALL_DIR"
   echo "    Installed (core + API + UI)"
 fi
 
