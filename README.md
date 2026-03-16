@@ -363,24 +363,64 @@ Scenes are managed in the **Scenes** tab of the Web UI or via the REST API.
 
 ## REST API
 
-Full OpenAPI documentation available at **http://localhost:8080/docs** when the server is running.
+> 📄 **[Full API Reference → docs/api.md](docs/api.md)**
 
-### Device Management
+Interactive Swagger UI at **`http://localhost:8080/docs`** when the server is running.
+
+### Endpoints overview
 
 ```
-GET    /api/devices                          List all configured devices
-POST   /api/devices                          Add a device
-GET    /api/devices/{address}                Get device details
-PATCH  /api/devices/{address}                Update device (name, pin, adapter)
-DELETE /api/devices/{address}                Remove device (history is kept)
-GET    /api/devices/{address}/status         Latest cached status (instant)
-GET    /api/devices/{address}/info           Cached device info (battery, last seen, MAC address)
-POST   /api/devices/{address}/poll           Trigger immediate BLE poll (409 if poll already running)
-POST   /api/devices/{address}/reset          Clear cached status + history for device
-PATCH  /api/devices/{address}/flags          Set child lock (and other flags)
-POST   /api/devices/set-child-lock           Bulk set child lock on all or specific devices
-POST   /api/devices/poll-all                 Trigger background poll of all devices (202 Accepted)
-GET    /api/devices/poll-all-status          Poll state: {running, current_device, started_at, completed_at}
+# Devices
+GET|POST          /api/devices
+GET|PATCH|DELETE  /api/devices/{address}
+GET               /api/devices/{address}/status    Cached status (instant, no BLE)
+GET               /api/devices/{address}/info      Cached metadata
+POST              /api/devices/{address}/poll       Immediate BLE poll
+POST              /api/devices/poll-all             Poll all (background)
+GET               /api/devices/poll-all-status      Poll progress
+PATCH             /api/devices/{address}/flags      Child lock
+POST              /api/devices/set-child-lock       Bulk child lock
+POST              /api/devices/{address}/rediscover UUID refresh after battery swap
+
+# Temperatures & Time
+GET|PUT           /api/devices/{address}/temperatures
+POST              /api/devices/{address}/sync-time
+
+# Schedules (weekly heating plan)
+GET|PUT           /api/devices/{address}/schedules
+PUT               /api/devices/{address}/schedules/{day}
+
+# Holidays (8 slots per device)
+GET               /api/devices/{address}/holidays
+PUT|DELETE        /api/devices/{address}/holidays/{slot}
+
+# Profiles (YAML files in ~/.cometblue/profiles/)
+GET               /api/profiles
+GET|PUT|DELETE    /api/profiles/{name}
+POST              /api/profiles/{name}/apply
+
+# Scenarios (profile per device)
+GET|POST          /api/presets
+GET|PUT|DELETE    /api/presets/{id}
+POST              /api/presets/{id}/apply           SSE stream with per-device progress
+
+# Scheduler (auto-apply at set times)
+GET|POST          /api/auto-triggers
+PUT|DELETE        /api/auto-triggers/{id}
+POST              /api/auto-triggers/{id}/run
+
+# Discovery
+POST              /api/discovery/scan               SSE stream of found devices
+GET               /api/discovery/known              Persisted scan results
+
+# History
+GET               /api/history/{address}            ?hours=24 or ?from=&to=&limit=
+GET               /api/history                      All devices (Monitor chart)
+
+# Settings & System
+PATCH             /api/settings/auto_poll
+PUT               /api/settings/poll-interval
+GET               /api/status
 ```
 
 **Bulk child lock example:**
@@ -403,194 +443,24 @@ curl -X PATCH http://localhost:8080/api/devices/E0:E5:CF:C1:D4:3F/flags \
   -d '{"child_lock": true}'
 ```
 
-### Temperature Control
-
-```
-GET  /api/devices/{address}/temperatures       Cached temperatures
-PUT  /api/devices/{address}/temperatures       Set temperature setpoints
-POST /api/devices/{address}/sync-time          Write current time to device
-```
-
-**Set temperatures example:**
-```bash
-curl -X PUT http://localhost:8080/api/devices/E0:E5:CF:C1:D4:3F/temperatures \
-  -H "Content-Type: application/json" \
-  -d '{"comfort": 22.0, "eco": 17.0, "manual": 20.0}'
-```
-
-### Schedules
-
-```
-GET  /api/devices/{address}/schedules          Full weekly schedule (live from device)
-PUT  /api/devices/{address}/schedules          Set full week
-PUT  /api/devices/{address}/schedules/{day}    Set one day (monday–sunday)
-```
-
-**Set one day example:**
-```bash
-curl -X PUT http://localhost:8080/api/devices/E0:E5:CF:C1:D4:3F/schedules/monday \
-  -H "Content-Type: application/json" \
-  -d '{"periods": [{"start": "07:00", "end": "12:00"}, {"start": "12:10", "end": "19:00"}]}'
-```
-
-### Holidays
-
-```
-GET    /api/devices/{address}/holidays          All 8 holiday slots
-PUT    /api/devices/{address}/holidays/{slot}   Set slot (1–8)
-DELETE /api/devices/{address}/holidays/{slot}   Clear slot
-```
-
-**Set holiday example:**
-```bash
-curl -X PUT http://localhost:8080/api/devices/E0:E5:CF:C1:D4:3F/holidays/1 \
-  -H "Content-Type: application/json" \
-  -d '{"start": "2026-12-24T00:00:00", "end": "2027-01-02T23:59:00", "temperature": 15.0, "active": true}'
-```
-
-### Profiles
-
-```
-GET  /api/profiles                     List profiles
-GET  /api/profiles/{name}              Get profile details (includes child_lock if set)
-PUT  /api/profiles/{name}              Create/update profile
-POST /api/profiles/{name}/apply        Apply profile to devices
-```
-
-**Apply profile example:**
-```bash
-# Apply to all devices with schedules:
-curl -X POST http://localhost:8080/api/profiles/winter/apply \
-  -H "Content-Type: application/json" \
-  -d '{"devices": ["all"], "apply_schedules": true}'
-
-# Apply temperatures only (no schedule change) to specific devices:
-curl -X POST http://localhost:8080/api/profiles/holiday/apply \
-  -H "Content-Type: application/json" \
-  -d '{"devices": ["E0:E5:CF:C1:D4:3F"], "apply_schedules": false}'
-```
-
-### Scenes (Presets)
-
-```
-GET    /api/presets                     List all scenes
-POST   /api/presets                     Create scene  { name, assignments: {address: profile} }
-GET    /api/presets/{id}                Get scene details
-PUT    /api/presets/{id}                Update scene
-DELETE /api/presets/{id}                Delete scene
-POST   /api/presets/{id}/apply          Apply scene (SSE stream — progress per device)
-```
-
-The `/apply` endpoint returns a **Server-Sent Events** stream:
-
-```
-event: progress
-data: {"address": "E0:E5:CF...", "profile": "winter", "index": 0, "total": 3}
-
-event: result
-data: {"address": "E0:E5:CF...", "status": "ok"}
-
-event: done
-data: {"preset": "Winter Abend", "results": {"E0:E5:CF...": "ok", ...}}
-```
-
-**Create and apply a scene example:**
-```bash
-# Create scene
-curl -X POST http://localhost:8080/api/presets \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Winter Abend", "assignments": {"E0:E5:CF:C1:D4:3F": "winter", "AA:BB:CC:DD:EE:FF": "spring"}}'
-
-# Apply scene (streamed)
-curl -N http://localhost:8080/api/presets/1/apply -X POST
-```
-
-### Discovery
-
-```
-POST /api/discovery/scan?timeout=10    BLE scan (SSE stream — device found events)
-GET  /api/discovery/known              Known/persisted scan results
-```
-
-### History
-
-```
-GET /api/history/{address}             Temperature + battery history
-    ?from=2026-03-01T00:00:00          Optional: start datetime (ISO)
-    &to=2026-03-14T23:59:59            Optional: end datetime (ISO)
-    &limit=500                          Optional: max records (default 500)
-```
-
-### Settings
-
-```
-PATCH /api/settings/auto_poll          Set auto-poll  { "enabled": true/false }
-PUT   /api/settings/poll-interval      Update poll interval  { "poll_interval": 600 }
-```
-
-### Scenarios (Szenarien)
-
-Scenarios assign profiles to specific devices and apply them all with one click.
-
-```
-GET    /api/presets                    List all scenarios
-POST   /api/presets                    Create scenario  { name, assignments: {address: profile} }
-GET    /api/presets/{id}               Get scenario details
-PUT    /api/presets/{id}               Update scenario
-DELETE /api/presets/{id}               Delete scenario
-POST   /api/presets/{id}/apply         Apply scenario (SSE stream — progress per device)
-```
-
-### Schedule (Zeitplan)
-
-Automatically apply a scenario or profile at set times.
-
-```
-GET    /api/auto-triggers              List all scheduled triggers
-POST   /api/auto-triggers              Create trigger
-PUT    /api/auto-triggers/{id}         Update trigger
-DELETE /api/auto-triggers/{id}         Delete trigger
-POST   /api/auto-triggers/{id}/run     Execute trigger immediately
-```
-
-Trigger body:
-```json
-{
-  "name": "Morning warm-up",
-  "type": "scenario",
-  "target_id": "1",
-  "days": ["mon","tue","wed","thu","fri"],
-  "time_hm": "06:30",
-  "enabled": true
-}
-```
-`type` is `"scenario"` (target_id = preset id) or `"profile"` (target_id = profile name, applied to all devices).
-`days` is `["daily"]` or any subset of `["mon","tue","wed","thu","fri","sat","sun"]`.
-
-### System
-
-```
-GET /api/status                        Service status, device count, next poll time, auto_poll flag
-```
+→ **[Full API Reference with examples and response schemas: docs/api.md](docs/api.md)**
 
 ---
 
 ## MCP Server
 
-The MCP server allows AI assistants (Claude) to control thermostats directly.
+> 📄 **[Full MCP Documentation → docs/mcp.md](docs/mcp.md)**
 
-### Setup with Claude Code
+The MCP server lets AI assistants (Claude) control your thermostats directly via natural language. It uses stdio transport and shares the same database as the REST API.
 
-**Option 1 — CLI (recommended):**
+### Quick setup
 
 ```bash
+# Claude Code CLI (recommended):
 claude mcp add cometblue -- /path/to/cometblue-control/.venv/bin/cometblue-control mcp
+
+# Or JSON config (~/.claude.json):
 ```
-
-Replace `/path/to/cometblue-control` with the actual install path (e.g. `~/.cometblue-control` on macOS or `/opt/cometblue-control` on Linux/Pi).
-
-**Option 2 — JSON config** (`~/.claude.json`, under `mcpServers`):
-
 ```json
 {
   "mcpServers": {
@@ -604,61 +474,26 @@ Replace `/path/to/cometblue-control` with the actual install path (e.g. `~/.come
 }
 ```
 
-**Verify it works:**
-
-```
-list my cometblue devices
-```
-
-Expected output (addresses anonymized):
-
-```
-⏺ cometblue - list_devices (MCP)
-
-⏺ Here are your 7 CometBlue devices:
-
-  ┌─────────────────────┬──────────────┬────────┬─────────┬───────────────────┐
-  │        Name         │ Current Temp │ Manual │ Battery │      Status       │
-  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
-  │ Bad                 │ 20.5°C       │ 18.0°C │ 29%     │ Error (not found) │
-  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
-  │ Kinderzimmer Links  │ 18.5°C       │ 18.0°C │ 65%     │ Error (not found) │
-  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
-  │ Kinderzimmer Rechts │ 18.5°C       │ 18.0°C │ 66%     │ Timeout           │
-  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
-  │ Küche               │ 17.5°C       │ 18.0°C │ 87%     │ Error (not found) │
-  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
-  │ Schlafzimmer        │ 19.5°C       │ 18.0°C │ 78%     │ OK                │
-  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
-  │ Wohnzimmer Links    │ 20.5°C       │ 18.0°C │ 78%     │ OK                │
-  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
-  │ Wohnzimmer Rechts   │ 20.0°C       │ 18.0°C │ 71%     │ OK                │
-  └─────────────────────┴──────────────┴────────┴─────────┴───────────────────┘
-
-  Notable: 4 devices have connection errors — they show cached data from
-  their last successful poll. The Bad thermostat also has a low battery at 29%.
-```
-
-> **Note:** Devices showing "Error (not found)" or "Timeout" display the last cached values — a manual poll or enabling auto-poll will refresh them.
-
-### Available MCP Tools
+### Available tools
 
 | Tool | Description |
 |---|---|
-| `list_devices` | List all configured devices with last known status |
-| `get_device_status` | Get current temperature and battery for a device |
-| `set_temperature` | Set comfort/eco/manual temperature setpoints |
+| `list_devices` | All devices with last known status (no BLE) |
+| `get_device_status` | Status for one device (no BLE) |
+| `set_temperature` | Set comfort / eco / manual setpoints |
 | `apply_profile` | Apply a heating profile to all or specific devices |
-| `discover_devices` | BLE scan for CometBlue devices |
-| `get_schedule` | Read weekly heating schedule from device |
-| `set_schedule` | Write schedule for a specific day |
-| `get_holidays` | Read all holiday slots from device |
-| `set_holiday` | Set a holiday period with temperature |
-| `get_history` | Query historical temperature data |
-| `sync_time` | Synchronize device clock to system time |
-| `list_profiles` | List available heating profiles |
-| `list_scenarios` | List all scenarios (profile assignments per device) |
+| `list_profiles` | List available profiles |
+| `list_scenarios` | List all scenarios |
 | `apply_scenario` | Apply a scenario by ID |
+| `discover_devices` | BLE scan for nearby devices |
+| `get_schedule` | Read weekly schedule from device |
+| `set_schedule` | Write schedule for one day |
+| `get_holidays` | Read all 8 holiday slots |
+| `set_holiday` | Set a holiday period |
+| `get_history` | Query temperature history |
+| `sync_time` | Sync device clock to system time |
+
+→ **[Full tool reference with inputs, outputs and examples: docs/mcp.md](docs/mcp.md)**
 
 ---
 
