@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 # CometBlue Control — Raspberry Pi Installer (armhf / arm64)
 #
-# ⚠️  ALPHA: Raspberry Pi support is functional but may require occasional
-#     service restarts due to BlueZ/dbus-fast compatibility issues.
-#
 # Tested on: Raspberry Pi 3B+, 4B — Raspberry Pi OS (Bookworm/Bullseye)
 # Usage: ./install-raspberry.sh [--with-mcp] [--install-dir=DIR]
 set -e
@@ -26,7 +23,6 @@ for arg in "$@"; do
 done
 
 echo "==> CometBlue Control — Raspberry Pi Installer"
-echo "    ⚠️  Raspberry Pi support is ALPHA — expect occasional BLE issues"
 echo ""
 
 if [ "$(uname)" != "Linux" ]; then
@@ -150,7 +146,7 @@ echo "    Logs:     journalctl -u cometblue -f"
 echo "    Web UI:   http://$(hostname -I | awk '{print $1}'):8080"
 echo "    Config:   $CONFIG_DIR/config.yaml"
 echo ""
-echo "    ⚠️  ALPHA notes:"
+echo "    Notes:"
 echo "    - Each device takes ~45s to poll on Pi 3B+ (GATT service discovery)"
 echo "    - If BLE stops working: sudo systemctl restart cometblue"
 echo "    - If Bluetooth is blocked: sudo rfkill unblock bluetooth"

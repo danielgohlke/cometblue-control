@@ -106,7 +106,7 @@ async def trigger_poll_now(address: Optional[str] = None) -> bool:
 
 async def _scheduled_poll():
     """Called by the scheduler — respects auto_poll setting and running guard."""
-    if await db.get_setting("auto_poll", "true") != "true":
+    if await db.get_setting("auto_poll", "false") != "true":
         log.debug("Auto-poll disabled, skipping scheduled poll")
         return
     await _poll_all_devices()

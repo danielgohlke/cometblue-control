@@ -68,7 +68,7 @@ def create_app() -> FastAPI:
     async def system_status():
         cfg = config.get()
         devices_list = await db.list_devices()
-        auto_poll = await db.get_setting("auto_poll", "true") == "true"
+        auto_poll = await db.get_setting("auto_poll", "false") == "true"
         return {
             "status": "ok",
             "devices": len(devices_list),

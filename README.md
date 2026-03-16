@@ -8,7 +8,7 @@ Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI �
 
 > **Web UI language:** English / German switchable in the nav bar
 
-> **Platform status:** macOS — stable · Linux/Raspberry Pi — alpha (BLE stack quirks may require occasional service restarts)
+> **Platform status:** macOS · Linux · Raspberry Pi
 
 ---
 
@@ -93,7 +93,7 @@ cd cometblue-control
 
 Supports apt (Debian/Ubuntu), dnf (Fedora), and pacman (Arch).
 
-### Raspberry Pi ⚠️ Alpha
+### Raspberry Pi
 
 ```bash
 git clone https://github.com/danielgohlke/cometblue-control
@@ -111,7 +111,7 @@ The Raspberry Pi installer automatically:
 - Installs and starts the systemd service
 - Sets `poll_interval: 600` (Pi 3B+ needs ~45s per device)
 
-> **Alpha notes:**
+> **Notes:**
 > Each device takes ~45s to poll on Pi 3B+ (GATT service discovery).
 > If BLE stops working: `sudo systemctl restart cometblue`
 
@@ -157,7 +157,7 @@ The config file is created at `~/.cometblue/config.yaml` on first run. Edit it t
 
 ```yaml
 host: "0.0.0.0"
-port: 8080
+port: 8080               # change port here, or use: cometblue-control serve --port 9000
 poll_interval: 300       # seconds between polls (default: 5 min)
 
 bluetooth:
@@ -171,6 +171,8 @@ log_level: "INFO"
 ```
 
 Runtime settings (e.g. `auto_poll`) are stored in the database and survive restarts. They can be toggled from the Web UI nav bar or via the settings API.
+
+> **Battery note:** Auto-poll is **disabled by default**. Each BLE poll connects to the thermostat and wakes it up, which consumes battery. Enable it only if you need continuous monitoring — and consider a longer `poll_interval` (600s or more) to reduce wear.
 
 ### Profiles
 
@@ -738,7 +740,7 @@ cometblue-control/
 │   └── cometblue.service    systemd unit file
 ├── install-macos.sh         macOS installer (optional launchd)
 ├── install-linux.sh         Linux installer (apt/dnf/pacman, optional systemd)
-├── install-raspberry.sh     Raspberry Pi installer (systemd, rfkill, alpha)
+├── install-raspberry.sh     Raspberry Pi installer (systemd, rfkill fix, Pi 3B+ tuning)
 └── pyproject.toml           Package definition
 ```
 

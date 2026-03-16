@@ -89,7 +89,7 @@ async def init_db(path: Optional[Path] = None):
                 value TEXT NOT NULL
             );
 
-            INSERT OR IGNORE INTO settings (key, value) VALUES ('auto_poll', 'true');
+            INSERT OR IGNORE INTO settings (key, value) VALUES ('auto_poll', 'false');
 
             CREATE TABLE IF NOT EXISTS presets (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,

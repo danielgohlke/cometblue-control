@@ -52,15 +52,18 @@
         <span x-text="pollingAll ? t('nav_polling') : t('nav_poll_all')"></span>
       </button>
       <!-- Auto-Poll Toggle -->
-      <label class="flex items-center gap-1.5 cursor-pointer" :title="t('nav_title_autopoll')">
-        <span class="text-xs" :class="autoPoll ? 'text-green-300' : 'text-white opacity-40'" x-text="t('nav_auto_poll')"></span>
-        <button @click="toggleAutoPoll()"
-          class="relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none"
-          :class="autoPoll ? 'bg-green-500' : 'bg-gray-500'">
-          <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
-            :class="autoPoll ? 'translate-x-4' : 'translate-x-0'"></span>
-        </button>
-      </label>
+      <div class="flex items-center gap-1.5">
+        <label class="flex items-center gap-1.5 cursor-pointer" :title="t('nav_title_autopoll')">
+          <span class="text-xs" :class="autoPoll ? 'text-green-300' : 'text-white opacity-40'" x-text="t('nav_auto_poll')"></span>
+          <button @click="toggleAutoPoll()"
+            class="relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none"
+            :class="autoPoll ? 'bg-green-500' : 'bg-gray-500'">
+            <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
+              :class="autoPoll ? 'translate-x-4' : 'translate-x-0'"></span>
+          </button>
+        </label>
+        <span x-show="autoPoll" class="text-xs text-yellow-300 opacity-80" :title="t('autopoll_battery_tooltip')">🔋⚠</span>
+      </div>
       <button @click="setLang(lang === 'de' ? 'en' : 'de')"
         :title="lang === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'"
         class="text-xs px-2 py-0.5 rounded font-mono transition-all opacity-60 hover:opacity-100 hover:bg-blue-800"
@@ -1200,6 +1203,7 @@ const TRANSLATIONS = {
     nav_auto_poll: 'Auto-Poll',
     nav_title_poll: 'Alle Geräte sofort abfragen',
     nav_title_autopoll: 'Automatisches Polling ein-/ausschalten',
+    autopoll_battery_tooltip: 'Auto-Poll aktiv — jede Abfrage verbraucht Batterie der Thermostate. Nur aktivieren wenn nötig.',
     nav_title_debug: 'Debug-Modus',
     nav_tab_dashboard: 'Dashboard',
     nav_tab_monitor: 'Monitor',
@@ -1477,6 +1481,7 @@ const TRANSLATIONS = {
     nav_auto_poll: 'Auto-Poll',
     nav_title_poll: 'Poll all devices now',
     nav_title_autopoll: 'Toggle automatic polling',
+    autopoll_battery_tooltip: 'Auto-Poll active — each poll drains the thermostat batteries. Only enable if needed.',
     nav_title_debug: 'Debug mode',
     nav_tab_dashboard: 'Dashboard',
     nav_tab_monitor: 'Monitor',
@@ -1789,7 +1794,7 @@ function app() {
     // Per-device BLE busy state: { address: 'message' }
     busyDevices: {},
     debugMode: false,
-    autoPoll: true,
+    autoPoll: false,
 
     // Assign discovered device modal
     showAssignModal: false,

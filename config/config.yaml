@@ -1,5 +1,7 @@
 # CometBlue Control Configuration
 
+# Server bind address and port
+# Change port here or via: cometblue-control serve --port 9000
 host: "0.0.0.0"
 port: 8080
 
