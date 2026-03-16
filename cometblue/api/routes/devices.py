@@ -54,6 +54,23 @@ async def add_device(body: models.DeviceAdd):
     return device
 
 
+@router.get("/poll-all-status")
+async def poll_all_status():
+    """Return the current poll-all state (running / last completed)."""
+    return get_poll_state()
+
+
+@router.post("/poll-all", status_code=202)
+async def poll_all_devices():
+    """Trigger a background poll of all devices. Returns immediately."""
+    if is_poll_running():
+        return {"status": "already_running"}
+    task = asyncio.create_task(trigger_poll_now())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return {"status": "triggered"}
+
+
 @router.get("/{address}", response_model=models.DeviceOut)
 async def get_device(address: str):
     device = await db.get_device(address)
@@ -225,23 +242,6 @@ async def rediscover_device(address: str):
 
     await db.update_device_address(old_address, new_address)
     return {"status": "updated", "old_address": old_address, "new_address": new_address, "mac": mac}
-
-
-@router.get("/poll-all-status")
-async def poll_all_status():
-    """Return the current poll-all state (running / last completed)."""
-    return get_poll_state()
-
-
-@router.post("/poll-all", status_code=202)
-async def poll_all_devices():
-    """Trigger a background poll of all devices. Returns immediately."""
-    if is_poll_running():
-        return {"status": "already_running"}
-    task = asyncio.create_task(trigger_poll_now())
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
-    return {"status": "triggered"}
 
 
 @router.post("/{address}/poll")
