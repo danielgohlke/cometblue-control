@@ -262,6 +262,14 @@ log_level: "INFO"
 
 Runtime settings (e.g. `auto_poll`, `poll_interval`) are stored in the database and survive restarts. They can be changed via the ⚙ settings button in the Web UI nav bar or via the settings API.
 
+To verify that a settings change took effect, watch the live log:
+
+```bash
+journalctl -u cometblue -f
+```
+
+You should see a line like `Poll interval updated to 900s` immediately after saving.
+
 > **Battery note:** Auto-poll is **disabled by default**. Each BLE poll connects to the thermostat and wakes it up, which consumes battery. Enable it only if you need continuous monitoring.
 
 > ⚠️ **Firmware bug — device freeze:** CometBlue thermostats have a known firmware bug where polling too frequently causes the device to stop responding entirely. The only recovery is to **remove and reinsert the battery**. The recommended poll interval is **15 minutes (900 s) or more**. The Web UI enforces a minimum of 15 minutes when changed via settings.

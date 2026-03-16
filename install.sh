@@ -63,8 +63,11 @@ else
   echo "    Installed (core + API + UI)"
 fi
 
-# Create user config dir
-CONFIG_DIR="$HOME/.cometblue"
+# Create user config dir — use the service user's actual home, not $HOME
+# (differs when running via sudo without -H)
+SERVICE_USER="$(whoami)"
+SERVICE_HOME="$(getent passwd "$SERVICE_USER" 2>/dev/null | cut -d: -f6 || echo "$HOME")"
+CONFIG_DIR="$SERVICE_HOME/.cometblue"
 mkdir -p "$CONFIG_DIR/profiles"
 
 if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
@@ -91,7 +94,7 @@ if [ $SETUP_SYSTEMD -eq 1 ]; then
     echo "==> Installing systemd service"
     SERVICE_FILE="$TARGET/systemd/cometblue.service"
     # Replace %i placeholder with current user
-    sudo bash -c "sed 's|%i|$(whoami)|g; s|/opt/cometblue-control|$INSTALL_DIR|g' '$SERVICE_FILE' > /etc/systemd/system/cometblue.service"
+    sudo bash -c "sed 's|%i|$SERVICE_USER|g; s|%h|$SERVICE_HOME|g; s|/opt/cometblue-control|$INSTALL_DIR|g' '$SERVICE_FILE' > /etc/systemd/system/cometblue.service"
     sudo systemctl daemon-reload
     sudo systemctl enable cometblue.service
     echo "    Service enabled. Start with: sudo systemctl start cometblue"
