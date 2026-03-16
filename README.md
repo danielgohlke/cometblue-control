@@ -2,32 +2,22 @@
 
 Cross-platform management system for **CometBlue / Comet Blue**, **Xavax Hama**, and **Sygonix HT100 BT** Bluetooth Low Energy radiator thermostats. Runs on macOS, Linux, and Raspberry Pi.
 
-Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI — all from a single Python package.
+![Dashboard](docs/screenshots/dashboard.png)
 
-> **Compatible devices:** Comet Blue · Xavax Hama · Sygonix HT100 BT (all share the same BLE protocol)
+| Monitor | Profile |
+|---------|---------|
+| ![Monitor](docs/screenshots/monitor.png) | ![Profiles](docs/screenshots/profiles.png) |
 
-> **Web UI language:** English / German switchable in the nav bar
-
-> **Platform status:** macOS · Linux · Raspberry Pi
-
----
-
-## Screenshots
-
-| Dashboard | Monitor |
-|-----------|---------|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Monitor](docs/screenshots/monitor.png) |
-
-| Heizprofile | Szenarien |
-|-------------|-----------|
-| ![Profiles](docs/screenshots/profiles.png) | ![Szenarien](docs/screenshots/szenarien.png) |
-
-| Zeitplan | Geräte entdecken |
-|----------|-----------------|
-| ![Zeitplan](docs/screenshots/zeitplan.png) | ![Discovery](docs/screenshots/discovery.png) |
+| Szenarien | Zeitplan |
+|-----------|----------|
+| ![Szenarien](docs/screenshots/szenarien.png) | ![Zeitplan](docs/screenshots/zeitplan.png) |
 
 <details>
-<summary>Weitere Screenshots (Modals)</summary>
+<summary>Weitere Screenshots</summary>
+
+| Geräte | Entdecken |
+|--------|-----------|
+| ![Devices](docs/screenshots/devices.png) | ![Discovery](docs/screenshots/discovery.png) |
 
 | Temperaturen setzen | Heizzeiten setzen |
 |--------------------|-------------------|
@@ -42,6 +32,16 @@ Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI �
 | ![Edit Timeplan](docs/screenshots/timeplan%20edit.png) | ![Set PIN](docs/screenshots/set%20pin%20edit.png) |
 
 </details>
+
+---
+
+Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI — all from a single Python package.
+
+> **Compatible devices:** Comet Blue · Xavax Hama · Sygonix HT100 BT (all share the same BLE protocol)
+
+> **Web UI language:** English / German switchable in the nav bar
+
+> **Platform status:** macOS · Linux · Raspberry Pi
 
 ---
 
