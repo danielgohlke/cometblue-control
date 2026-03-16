@@ -32,7 +32,7 @@
 <nav class="bg-blue-700 text-white shadow-md">
   <div class="max-w-6xl mx-auto px-4 flex items-center gap-1 h-14">
     <span class="font-bold text-lg tracking-wide mr-4">🔥 CometBlue</span>
-    <template x-for="tab in ['dashboard','monitor','devices','profiles','szenen','discovery']" :key="tab">
+    <template x-for="tab in ['dashboard','monitor','devices','profiles','szenen','zeitplan','discovery']" :key="tab">
       <button @click="page=tab; localStorage.setItem('cb_page',tab); onPageChange(tab)"
         :class="page===tab ? 'border-b-2 border-white bg-blue-800' : 'opacity-70 hover:opacity-100'"
         class="relative px-3 py-1 text-sm font-medium rounded-t">
@@ -73,10 +73,11 @@
         class="text-xs px-2 py-0.5 rounded font-mono transition-all">DBG</button>
       <a href="https://github.com/danielgohlke/cometblue-control" target="_blank" rel="noopener"
         title="GitHub — danielgohlke/cometblue-control"
-        class="opacity-40 hover:opacity-100 transition-all flex items-center">
-        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+        class="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-white/10 hover:bg-white/20 transition-all opacity-90 hover:opacity-100">
+        <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
           <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
         </svg>
+        <span class="hidden sm:inline">GitHub</span>
       </a>
     </div>
   </div>
@@ -402,7 +403,7 @@
     </div>
   </div>
 
-  <!-- ══════════════════ SZENEN ══════════════════ -->
+  <!-- ══════════════════ SZENARIEN ══════════════════ -->
   <div x-show="page === 'szenen'">
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold" x-text="t('szenen_title')"></h1>
@@ -480,6 +481,158 @@
           </button>
         </div>
       </template>
+    </div>
+  </div>
+
+  <!-- ══════════════════ ZEITPLAN ══════════════════ -->
+  <div x-show="page === 'zeitplan'">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold" x-text="t('zeitplan_title')"></h1>
+      <button @click="openNewTrigger()" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700" x-text="t('zeitplan_new_btn')"></button>
+    </div>
+    <p class="text-sm text-gray-500 mb-5" x-text="t('zeitplan_description')"></p>
+
+    <div x-show="autoTriggers.length === 0" class="text-gray-400 italic" x-text="t('zeitplan_empty')"></div>
+
+    <div class="space-y-3">
+      <template x-for="trigger in autoTriggers" :key="trigger.id">
+        <div class="bg-white rounded-lg shadow p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <!-- Enable toggle -->
+          <button @click="toggleTriggerEnabled(trigger)"
+            class="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
+            :class="trigger.enabled ? 'bg-green-500' : 'bg-gray-300'">
+            <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"
+              :class="trigger.enabled ? 'translate-x-5' : 'translate-x-0'"></span>
+          </button>
+
+          <!-- Info -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-semibold text-gray-800" x-text="trigger.name"></span>
+              <span class="text-xs px-1.5 py-0.5 rounded font-medium"
+                :class="trigger.type === 'scenario' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'"
+                x-text="trigger.type === 'scenario' ? t('zeitplan_type_scenario') : t('zeitplan_type_profile')"></span>
+            </div>
+            <div class="text-sm text-gray-500 mt-0.5 flex items-center gap-3 flex-wrap">
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span x-text="trigger.time_hm"></span>
+                &nbsp;·&nbsp;
+                <span x-text="formatTriggerDays(trigger.days)"></span>
+              </span>
+              <span class="text-gray-400">→ <span x-text="trigger.target_label || trigger.target_id"></span></span>
+              <span x-show="trigger.next_run && trigger.enabled" class="text-xs text-green-600"
+                x-text="t('zeitplan_next') + ' ' + fmtTime(trigger.next_run)"></span>
+              <span x-show="trigger.last_run" class="text-xs text-gray-400"
+                x-text="t('zeitplan_last') + ' ' + fmtTime(trigger.last_run)"></span>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button @click="runTriggerNow(trigger)" :disabled="trigger._running"
+              class="text-gray-400 hover:text-green-600 p-1.5 rounded hover:bg-gray-100" :title="t('zeitplan_run_now')">
+              <svg x-show="!trigger._running" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <svg x-show="trigger._running" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+            </button>
+            <button @click="openEditTrigger(trigger)" class="text-gray-400 hover:text-blue-500 p-1.5 rounded hover:bg-gray-100" :title="t('zeitplan_edit')">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            </button>
+            <button @click="deleteTrigger(trigger.id)" class="text-gray-400 hover:text-red-500 p-1.5 rounded hover:bg-gray-100" :title="t('zeitplan_delete')">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Create / Edit Modal -->
+    <div x-show="showTriggerModal" x-cloak
+      class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      @click.self="showTriggerModal=false">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+        <h2 class="text-lg font-bold" x-text="editingTrigger ? t('zeitplan_modal_edit') : t('zeitplan_modal_new')"></h2>
+
+        <!-- Name -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" x-text="t('zeitplan_field_name')"></label>
+          <input x-model="triggerForm.name" type="text" class="w-full border rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <!-- Type -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" x-text="t('zeitplan_field_type')"></label>
+          <div class="flex gap-3">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" x-model="triggerForm.type" value="scenario" class="accent-purple-600">
+              <span class="text-sm" x-text="t('zeitplan_type_scenario')"></span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" x-model="triggerForm.type" value="profile" class="accent-blue-600">
+              <span class="text-sm" x-text="t('zeitplan_type_profile')"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Target — scenario or profile selector -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" x-text="t('zeitplan_field_target')"></label>
+          <select x-model="triggerForm.target_id" class="w-full border rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <option value="" x-text="t('zeitplan_select_placeholder')"></option>
+            <template x-if="triggerForm.type === 'scenario'">
+              <template x-for="p in presets" :key="p.id">
+                <option :value="String(p.id)" x-text="p.name"></option>
+              </template>
+            </template>
+            <template x-if="triggerForm.type === 'profile'">
+              <template x-for="p in profilesList" :key="p.name">
+                <option :value="p.name" x-text="p.name"></option>
+              </template>
+            </template>
+          </select>
+        </div>
+
+        <!-- Time -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" x-text="t('zeitplan_field_time')"></label>
+          <input x-model="triggerForm.time_hm" type="time" class="border rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <!-- Days -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" x-text="t('zeitplan_field_days')"></label>
+          <div class="flex flex-wrap gap-2">
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" :checked="triggerForm.days.includes('daily')"
+                @change="triggerForm.days = $event.target.checked ? ['daily'] : []" class="accent-blue-600">
+              <span class="text-sm" x-text="t('zeitplan_daily')"></span>
+            </label>
+            <template x-for="d in ['mon','tue','wed','thu','fri','sat','sun']" :key="d">
+              <label class="flex items-center gap-1 cursor-pointer" x-show="!triggerForm.days.includes('daily')">
+                <input type="checkbox" :checked="triggerForm.days.includes(d)"
+                  @change="triggerForm.days = $event.target.checked ? [...triggerForm.days.filter(x=>x!=='daily'), d] : triggerForm.days.filter(x=>x!==d)"
+                  class="accent-blue-600">
+                <span class="text-xs" x-text="t('day_short_' + d)"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <!-- Enabled -->
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" x-model="triggerForm.enabled" class="accent-blue-600">
+          <span class="text-sm" x-text="t('zeitplan_field_enabled')"></span>
+        </label>
+
+        <!-- Error -->
+        <p x-show="triggerFormError" class="text-red-600 text-sm" x-text="triggerFormError"></p>
+
+        <!-- Buttons -->
+        <div class="flex justify-end gap-2 pt-2">
+          <button @click="showTriggerModal=false" class="px-4 py-1.5 rounded border text-sm hover:bg-gray-50" x-text="t('btn_cancel')"></button>
+          <button @click="saveTrigger()" class="px-4 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700" x-text="t('btn_save')"></button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1216,7 +1369,8 @@ const TRANSLATIONS = {
     nav_tab_monitor: 'Monitor',
     nav_tab_devices: 'Geräte',
     nav_tab_profiles: 'Profile',
-    nav_tab_szenen: 'Szenen',
+    nav_tab_szenen: 'Szenarien',
+    nav_tab_zeitplan: 'Zeitplan',
     nav_tab_discovery: 'Entdecken',
 
     // Dashboard
@@ -1273,16 +1427,46 @@ const TRANSLATIONS = {
     profiles_apply_btn: 'Anwenden…',
     profiles_no_profiles: 'Noch keine Profile. Erstelle eines mit "+ Neues Profil".',
 
-    // Szenen / Scenes page
-    szenen_title: 'Szenen',
-    szenen_new_btn: '+ Neue Szene',
-    szenen_description: 'Jede Szene weist bestimmten Geräten ein Profil zu. Mit einem Klick werden alle Zuweisungen gleichzeitig angewendet.',
-    szenen_no_scenes: 'Noch keine Szenen. Erstelle eine mit "+ Neue Szene".',
+    // Szenarien page
+    szenen_title: 'Szenarien',
+    szenen_new_btn: '+ Neues Szenario',
+    szenen_description: 'Jedes Szenario weist bestimmten Geräten ein Profil zu. Mit einem Klick werden alle Zuweisungen gleichzeitig angewendet.',
+    szenen_no_scenes: 'Noch keine Szenarien. Erstelle eines mit "+ Neues Szenario".',
     szenen_edit_title: 'Bearbeiten',
     szenen_delete_title: 'Löschen',
     szenen_devices_count: 'Geräte',
     szenen_applying: 'Wird angewendet…',
-    szenen_apply_btn: 'Szene anwenden',
+    szenen_apply_btn: 'Szenario anwenden',
+
+    // Zeitplan page
+    zeitplan_title: 'Zeitplan',
+    zeitplan_description: 'Szenarien oder Profile automatisch zu festen Zeiten anwenden.',
+    zeitplan_new_btn: '+ Neuer Zeitplan',
+    zeitplan_empty: 'Noch kein Zeitplan. Erstelle einen mit "+ Neuer Zeitplan".',
+    zeitplan_type_scenario: 'Szenario',
+    zeitplan_type_profile: 'Profil',
+    zeitplan_daily: 'Täglich',
+    zeitplan_next: 'Nächste:',
+    zeitplan_last: 'Zuletzt:',
+    zeitplan_run_now: 'Jetzt ausführen',
+    zeitplan_edit: 'Bearbeiten',
+    zeitplan_delete: 'Löschen',
+    zeitplan_ran: '✓ Zeitplan ausgeführt',
+    zeitplan_confirm_delete: 'Zeitplan wirklich löschen?',
+    zeitplan_modal_new: 'Neuer Zeitplan',
+    zeitplan_modal_edit: 'Zeitplan bearbeiten',
+    zeitplan_field_name: 'Name',
+    zeitplan_field_type: 'Typ',
+    zeitplan_field_target: 'Szenario / Profil',
+    zeitplan_field_time: 'Uhrzeit',
+    zeitplan_field_days: 'Wochentage',
+    zeitplan_field_enabled: 'Aktiv',
+    zeitplan_select_placeholder: '– auswählen –',
+    zeitplan_err_name: 'Bitte einen Namen eingeben.',
+    zeitplan_err_target: 'Bitte ein Szenario oder Profil auswählen.',
+    zeitplan_err_days: 'Bitte mindestens einen Wochentag wählen.',
+    day_short_mon: 'Mo', day_short_tue: 'Di', day_short_wed: 'Mi', day_short_thu: 'Do',
+    day_short_fri: 'Fr', day_short_sat: 'Sa', day_short_sun: 'So',
 
     // Discovery page
     discovery_title: 'Geräte entdecken',
@@ -1494,7 +1678,8 @@ const TRANSLATIONS = {
     nav_tab_monitor: 'Monitor',
     nav_tab_devices: 'Devices',
     nav_tab_profiles: 'Profiles',
-    nav_tab_szenen: 'Scenes',
+    nav_tab_szenen: 'Scenarios',
+    nav_tab_zeitplan: 'Schedule',
     nav_tab_discovery: 'Discover',
 
     // Dashboard
@@ -1551,16 +1736,46 @@ const TRANSLATIONS = {
     profiles_apply_btn: 'Apply…',
     profiles_no_profiles: 'No profiles yet. Create one with "+ New Profile".',
 
-    // Szenen / Scenes page
-    szenen_title: 'Scenes',
-    szenen_new_btn: '+ New Scene',
-    szenen_description: 'Each scene assigns a profile to specific devices. One click applies all assignments at once.',
-    szenen_no_scenes: 'No scenes yet. Create one with "+ New Scene".',
+    // Scenarios page
+    szenen_title: 'Scenarios',
+    szenen_new_btn: '+ New Scenario',
+    szenen_description: 'Each scenario assigns a profile to specific devices. One click applies all assignments at once.',
+    szenen_no_scenes: 'No scenarios yet. Create one with "+ New Scenario".',
     szenen_edit_title: 'Edit',
     szenen_delete_title: 'Delete',
     szenen_devices_count: 'devices',
     szenen_applying: 'Applying…',
-    szenen_apply_btn: 'Apply Scene',
+    szenen_apply_btn: 'Apply Scenario',
+
+    // Schedule page
+    zeitplan_title: 'Schedule',
+    zeitplan_description: 'Automatically apply scenarios or profiles at set times.',
+    zeitplan_new_btn: '+ New Schedule',
+    zeitplan_empty: 'No schedules yet. Create one with "+ New Schedule".',
+    zeitplan_type_scenario: 'Scenario',
+    zeitplan_type_profile: 'Profile',
+    zeitplan_daily: 'Daily',
+    zeitplan_next: 'Next:',
+    zeitplan_last: 'Last:',
+    zeitplan_run_now: 'Run now',
+    zeitplan_edit: 'Edit',
+    zeitplan_delete: 'Delete',
+    zeitplan_ran: '✓ Schedule executed',
+    zeitplan_confirm_delete: 'Really delete this schedule?',
+    zeitplan_modal_new: 'New Schedule',
+    zeitplan_modal_edit: 'Edit Schedule',
+    zeitplan_field_name: 'Name',
+    zeitplan_field_type: 'Type',
+    zeitplan_field_target: 'Scenario / Profile',
+    zeitplan_field_time: 'Time',
+    zeitplan_field_days: 'Days',
+    zeitplan_field_enabled: 'Active',
+    zeitplan_select_placeholder: '— select —',
+    zeitplan_err_name: 'Please enter a name.',
+    zeitplan_err_target: 'Please select a scenario or profile.',
+    zeitplan_err_days: 'Please select at least one day.',
+    day_short_mon: 'Mon', day_short_tue: 'Tue', day_short_wed: 'Wed', day_short_thu: 'Thu',
+    day_short_fri: 'Fri', day_short_sat: 'Sat', day_short_sun: 'Sun',
 
     // Discovery page
     discovery_title: 'Discover Devices',
@@ -1866,6 +2081,13 @@ function app() {
     presetSetAllProfile: '',
     childLockBusy: false,
 
+    autoTriggers: [],
+    showTriggerModal: false,
+    editingTrigger: null,
+    triggerForm: {name: '', type: 'scenario', target_id: '', days: ['daily'], time_hm: '07:00', enabled: true},
+    triggerFormError: '',
+    profilesList: [],
+
     pollingDevices: {},
     pollingAll: false,
     showApplyProfile: false,
@@ -1883,7 +2105,7 @@ function app() {
     async init() {
       // Restore page from localStorage but validate it's a known tab
       const saved = localStorage.getItem('cb_page');
-      if (saved && ['dashboard','monitor','devices','profiles','discovery'].includes(saved)) {
+      if (saved && ['dashboard','monitor','devices','profiles','szenen','zeitplan','discovery'].includes(saved)) {
         this.page = saved;
         this.onPageChange(saved);
       }
@@ -1898,6 +2120,7 @@ function app() {
       if (tab === 'discovery') this.loadKnownDevices();
       if (tab === 'monitor')   this.loadMonitor();
       if (tab === 'szenen')    this.loadPresets();
+      if (tab === 'zeitplan')  this.loadAutoTriggers();
     },
 
     async loadDevices() {
@@ -1947,6 +2170,96 @@ function app() {
     async loadPresets() {
       this.presets = await fetch(`${API}/api/presets`).then(r => r.json()).catch(() => []);
     },
+
+    // ── Auto-triggers (Zeitplan) ─────────────────────────────────────────────
+
+    async loadAutoTriggers() {
+      const triggers = await fetch(`${API}/api/auto-triggers`).then(r => r.json()).catch(() => []);
+      // Enrich with human-readable target label
+      await this.loadPresets();
+      await this.loadProfilesList();
+      for (const t of triggers) {
+        if (t.type === 'scenario') {
+          const p = this.presets.find(p => String(p.id) === String(t.target_id));
+          t.target_label = p ? p.name : t.target_id;
+        } else {
+          t.target_label = t.target_id;
+        }
+      }
+      this.autoTriggers = triggers;
+    },
+
+    async loadProfilesList() {
+      if (this.profilesList && this.profilesList.length) return;
+      this.profilesList = await fetch(`${API}/api/profiles`).then(r => r.json()).catch(() => []);
+    },
+
+    formatTriggerDays(days) {
+      if (!days || days.includes('daily')) return this.t('zeitplan_daily');
+      const map = {mon: this.t('day_short_mon'), tue: this.t('day_short_tue'), wed: this.t('day_short_wed'),
+                   thu: this.t('day_short_thu'), fri: this.t('day_short_fri'), sat: this.t('day_short_sat'), sun: this.t('day_short_sun')};
+      return days.map(d => map[d] || d).join(', ');
+    },
+
+    openNewTrigger() {
+      this.editingTrigger = null;
+      this.triggerFormError = '';
+      this.triggerForm = {name: '', type: 'scenario', target_id: '', days: ['daily'], time_hm: '07:00', enabled: true};
+      this.loadPresets();
+      this.loadProfilesList();
+      this.showTriggerModal = true;
+    },
+
+    openEditTrigger(trigger) {
+      this.editingTrigger = trigger;
+      this.triggerFormError = '';
+      this.triggerForm = {
+        name: trigger.name, type: trigger.type, target_id: trigger.target_id,
+        days: [...trigger.days], time_hm: trigger.time_hm, enabled: trigger.enabled,
+      };
+      this.loadPresets();
+      this.loadProfilesList();
+      this.showTriggerModal = true;
+    },
+
+    async saveTrigger() {
+      this.triggerFormError = '';
+      const f = this.triggerForm;
+      if (!f.name.trim()) { this.triggerFormError = this.t('zeitplan_err_name'); return; }
+      if (!f.target_id)   { this.triggerFormError = this.t('zeitplan_err_target'); return; }
+      if (!f.days.length) { this.triggerFormError = this.t('zeitplan_err_days'); return; }
+      const body = {name: f.name.trim(), type: f.type, target_id: f.target_id, days: f.days, time_hm: f.time_hm, enabled: f.enabled};
+      const url = this.editingTrigger ? `${API}/api/auto-triggers/${this.editingTrigger.id}` : `${API}/api/auto-triggers`;
+      const method = this.editingTrigger ? 'PUT' : 'POST';
+      const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+      if (!res.ok) { this.triggerFormError = await res.text(); return; }
+      this.showTriggerModal = false;
+      await this.loadAutoTriggers();
+    },
+
+    async deleteTrigger(id) {
+      if (!confirm(this.t('zeitplan_confirm_delete'))) return;
+      await fetch(`${API}/api/auto-triggers/${id}`, {method: 'DELETE'});
+      await this.loadAutoTriggers();
+    },
+
+    async toggleTriggerEnabled(trigger) {
+      const body = {name: trigger.name, type: trigger.type, target_id: trigger.target_id,
+                    days: trigger.days, time_hm: trigger.time_hm, enabled: !trigger.enabled};
+      await fetch(`${API}/api/auto-triggers/${trigger.id}`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+      await this.loadAutoTriggers();
+    },
+
+    async runTriggerNow(trigger) {
+      trigger._running = true;
+      this.autoTriggers = [...this.autoTriggers];
+      await fetch(`${API}/api/auto-triggers/${trigger.id}/run`, {method: 'POST'});
+      trigger._running = false;
+      await this.loadAutoTriggers();
+      this.showToast(this.t('zeitplan_ran'));
+    },
+
+    // ────────────────────────────────────────────────────────────────────────
 
     openNewPreset() {
       this.presetEditId = null;
@@ -2602,8 +2915,10 @@ function app() {
             const r = await fetch(`${API}/api/devices/poll-all-status`);
             const s = await r.json();
             const cur = s.current_device || null;
-            // Move the busy indicator to the currently-polled device card
+            // When a device finishes, refresh its status immediately so
+            // connection errors disappear as soon as the poll succeeds
             if (prevDevice && prevDevice !== cur) {
+              await this._refreshDeviceStatus(prevDevice);
               const d = {...this.busyDevices};
               delete d[prevDevice];
               this.busyDevices = d;
@@ -2625,6 +2940,18 @@ function app() {
       }
     },
 
+    // Refresh a single device's status in this.devices without a full reload
+    async _refreshDeviceStatus(address) {
+      const s = await fetch(`${API}/api/devices/${address}/status`).then(r => r.json()).catch(() => null);
+      if (s === null) return;
+      const idx = this.devices.findIndex(d => d.address === address);
+      if (idx !== -1) {
+        this.devices[idx] = {...this.devices[idx], status: s};
+        this.devices = [...this.devices];
+        this.computeAlerts();
+      }
+    },
+
     async pollDevice(address) {
       if (this.pollingDevices[address] || this.busyDevices[address]) return;
       if (this.pollingAll) {
@@ -2638,6 +2965,17 @@ function app() {
         if (res.status === 409) {
           this.showToast(this.t('toast_poll_busy'));
           return;
+        }
+        // The poll route returns the fresh status directly — use it immediately
+        // so connection errors disappear without waiting for loadDevices()
+        const freshStatus = await res.json().catch(() => null);
+        if (freshStatus && freshStatus.polled_at) {
+          const idx = this.devices.findIndex(d => d.address === address);
+          if (idx !== -1) {
+            this.devices[idx] = {...this.devices[idx], status: freshStatus};
+            this.devices = [...this.devices];
+            this.computeAlerts();
+          }
         }
         await this.loadDevices();
         this.showToast(this.t('toast_poll_done'));

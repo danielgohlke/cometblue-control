@@ -289,6 +289,7 @@ GET    /api/devices/{address}                Get device details
 PATCH  /api/devices/{address}                Update device (name, pin, adapter)
 DELETE /api/devices/{address}                Remove device (history is kept)
 GET    /api/devices/{address}/status         Latest cached status (instant)
+GET    /api/devices/{address}/info           Cached device info (battery, last seen, MAC address)
 POST   /api/devices/{address}/poll           Trigger immediate BLE poll (409 if poll already running)
 POST   /api/devices/{address}/reset          Clear cached status + history for device
 PATCH  /api/devices/{address}/flags          Set child lock (and other flags)
@@ -438,9 +439,48 @@ GET /api/history/{address}             Temperature + battery history
 ### Settings
 
 ```
-GET   /api/settings/auto_poll          Get auto-poll setting
 PATCH /api/settings/auto_poll          Set auto-poll  { "enabled": true/false }
+PUT   /api/settings/poll-interval      Update poll interval  { "poll_interval": 600 }
 ```
+
+### Scenarios (Szenarien)
+
+Scenarios assign profiles to specific devices and apply them all with one click.
+
+```
+GET    /api/presets                    List all scenarios
+POST   /api/presets                    Create scenario  { name, assignments: {address: profile} }
+GET    /api/presets/{id}               Get scenario details
+PUT    /api/presets/{id}               Update scenario
+DELETE /api/presets/{id}               Delete scenario
+POST   /api/presets/{id}/apply         Apply scenario (SSE stream — progress per device)
+```
+
+### Schedule (Zeitplan)
+
+Automatically apply a scenario or profile at set times.
+
+```
+GET    /api/auto-triggers              List all scheduled triggers
+POST   /api/auto-triggers              Create trigger
+PUT    /api/auto-triggers/{id}         Update trigger
+DELETE /api/auto-triggers/{id}         Delete trigger
+POST   /api/auto-triggers/{id}/run     Execute trigger immediately
+```
+
+Trigger body:
+```json
+{
+  "name": "Morning warm-up",
+  "type": "scenario",
+  "target_id": "1",
+  "days": ["mon","tue","wed","thu","fri"],
+  "time_hm": "06:30",
+  "enabled": true
+}
+```
+`type` is `"scenario"` (target_id = preset id) or `"profile"` (target_id = profile name, applied to all devices).
+`days` is `["daily"]` or any subset of `["mon","tue","wed","thu","fri","sat","sun"]`.
 
 ### System
 
@@ -456,18 +496,48 @@ The MCP server allows AI assistants (Claude) to control thermostats directly.
 
 ### Setup with Claude Code
 
-Add to your Claude Code MCP config (`~/.claude/claude_code_config.json`):
+**Option 1 — CLI (recommended):**
+
+```bash
+claude mcp add cometblue -- /path/to/cometblue-control/.venv/bin/cometblue-control mcp
+```
+
+Replace `/path/to/cometblue-control` with the actual install path (e.g. `~/.cometblue-control` on macOS or `/opt/cometblue-control` on Linux/Pi).
+
+**Option 2 — JSON config** (`~/.claude.json`, under `mcpServers`):
 
 ```json
 {
   "mcpServers": {
     "cometblue": {
+      "type": "stdio",
       "command": "/path/to/cometblue-control/.venv/bin/cometblue-control",
-      "args": ["mcp"]
+      "args": ["mcp"],
+      "env": {}
     }
   }
 }
 ```
+
+**Verify it works:**
+
+```
+list my cometblue devices
+```
+
+Expected output (addresses are anonymized):
+
+```
+┌─────────────────────┬──────────────┬────────┬─────────┬────────┐
+│        Name         │ Current Temp │ Manual │ Battery │ Status │
+├─────────────────────┼──────────────┼────────┼─────────┼────────┤
+│ Wohnzimmer Links    │ 20.5°C       │ 18.0°C │ 78%     │ OK     │
+│ Wohnzimmer Rechts   │ 20.0°C       │ 18.0°C │ 71%     │ OK     │
+│ Schlafzimmer        │ 19.5°C       │ 18.0°C │ 78%     │ OK     │
+└─────────────────────┴──────────────┴────────┴─────────┴────────┘
+```
+
+> **Note:** Devices showing "Error (not found)" or "Timeout" display the last cached values — a manual poll or enabling auto-poll will refresh them.
 
 ### Available MCP Tools
 
@@ -485,6 +555,8 @@ Add to your Claude Code MCP config (`~/.claude/claude_code_config.json`):
 | `get_history` | Query historical temperature data |
 | `sync_time` | Synchronize device clock to system time |
 | `list_profiles` | List available heating profiles |
+| `list_scenarios` | List all scenarios (profile assignments per device) |
+| `apply_scenario` | Apply a scenario by ID |
 
 ---
 

@@ -173,6 +173,22 @@ def create_server() -> Server:
                 description="List all available heating profiles.",
                 inputSchema={"type": "object", "properties": {}},
             ),
+            types.Tool(
+                name="list_scenarios",
+                description="List all saved scenarios (each scenario assigns a profile to specific devices).",
+                inputSchema={"type": "object", "properties": {}},
+            ),
+            types.Tool(
+                name="apply_scenario",
+                description="Apply a scenario: sets the assigned profile on each device in the scenario.",
+                inputSchema={
+                    "type": "object",
+                    "required": ["scenario_id"],
+                    "properties": {
+                        "scenario_id": {"type": "integer", "description": "Scenario ID (from list_scenarios)"},
+                    },
+                },
+            ),
         ]
 
     @server.call_tool()
@@ -312,6 +328,24 @@ async def _dispatch(name: str, args: dict) -> Any:
 
     elif name == "list_profiles":
         return [{"name": n} for n in prof.list_profiles()]
+
+    elif name == "list_scenarios":
+        return await db.list_presets()
+
+    elif name == "apply_scenario":
+        scenario_id = int(args["scenario_id"])
+        preset = await db.get_preset(scenario_id)
+        if not preset:
+            return {"error": f"Scenario {scenario_id} not found"}
+        results = {}
+        for address, profile_name in preset["assignments"].items():
+            if profile_name:
+                try:
+                    res = await prof.apply_profile(profile_name, [address], apply_schedules=True)
+                    results[address] = res.get(address, "ok")
+                except Exception as e:
+                    results[address] = str(e)
+        return {"scenario": preset["name"], "results": results}
 
     else:
         return {"error": f"Unknown tool: {name}"}

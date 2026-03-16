@@ -64,6 +64,17 @@ def shutdown():
         log.info("Scheduler stopped")
 
 
+def update_poll_interval(new_interval: int) -> None:
+    """Reschedule the background poll job with a new interval (seconds)."""
+    if not _scheduler:
+        return
+    _scheduler.reschedule_job(
+        "poll_all",
+        trigger=IntervalTrigger(seconds=new_interval),
+    )
+    log.info("Poll interval updated to %ds", new_interval)
+
+
 def get_next_run() -> Optional[str]:
     if not _scheduler:
         return None

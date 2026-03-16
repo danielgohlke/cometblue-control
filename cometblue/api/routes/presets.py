@@ -24,6 +24,14 @@ async def list_presets():
     return await db.list_presets()
 
 
+@router.get("/{preset_id}")
+async def get_preset(preset_id: int):
+    preset = await db.get_preset(preset_id)
+    if not preset:
+        raise HTTPException(404, "Preset not found")
+    return preset
+
+
 @router.post("", status_code=201)
 async def create_preset(body: PresetBody):
     try:

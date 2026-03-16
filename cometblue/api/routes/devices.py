@@ -79,6 +79,27 @@ async def get_device(address: str):
     return device
 
 
+@router.get("/{address}/info")
+async def get_device_info(address: str):
+    """Cached device info: config + battery level + last poll timestamp."""
+    device = await db.get_device(address)
+    if not device:
+        raise HTTPException(404, "Device not found")
+    status = await db.get_status(address) or {}
+    return {
+        "address": device["address"],
+        "name": device["name"],
+        "mac_address": device.get("mac_address"),
+        "adapter": device.get("adapter"),
+        "added_at": device.get("added_at"),
+        "last_seen": device.get("last_seen"),
+        "battery": status.get("battery"),
+        "device_time": status.get("device_time"),
+        "polled_at": status.get("polled_at"),
+        "error": status.get("error"),
+    }
+
+
 @router.patch("/{address}", response_model=models.DeviceOut)
 async def patch_device(address: str, body: DevicePatch):
     device = await db.get_device(address)

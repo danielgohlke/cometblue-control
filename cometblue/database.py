@@ -96,6 +96,18 @@ async def init_db(path: Optional[Path] = None):
                 name        TEXT NOT NULL UNIQUE,
                 assignments TEXT NOT NULL DEFAULT '{}'
             );
+
+            CREATE TABLE IF NOT EXISTS auto_triggers (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT NOT NULL,
+                type        TEXT NOT NULL,
+                target_id   TEXT NOT NULL,
+                days        TEXT NOT NULL DEFAULT '["daily"]',
+                time_hm     TEXT NOT NULL DEFAULT '07:00',
+                enabled     INTEGER NOT NULL DEFAULT 1,
+                last_run    TEXT,
+                created_at  TEXT NOT NULL
+            );
         """)
         await db.commit()
     log.info("Database ready at %s", db_path)
@@ -384,6 +396,69 @@ async def set_setting(key: str, value: str):
         await db.execute(
             "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (key, value),
+        )
+        await db.commit()
+
+
+# ── Auto-triggers (scheduled scenario/profile application) ────────────────────
+
+def _parse_trigger(row) -> dict:
+    d = dict(row)
+    d["days"] = json.loads(d["days"])
+    d["enabled"] = bool(d["enabled"])
+    return d
+
+
+async def list_auto_triggers() -> list[dict]:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM auto_triggers ORDER BY time_hm, name") as cur:
+            rows = await cur.fetchall()
+            return [_parse_trigger(r) for r in rows]
+
+
+async def get_auto_trigger(trigger_id: int) -> Optional[dict]:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM auto_triggers WHERE id = ?", (trigger_id,)) as cur:
+            row = await cur.fetchone()
+            return _parse_trigger(row) if row else None
+
+
+async def create_auto_trigger(name: str, type: str, target_id: str,
+                              days: list, time_hm: str, enabled: bool = True) -> dict:
+    now = datetime.utcnow().isoformat()
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO auto_triggers (name, type, target_id, days, time_hm, enabled, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (name, type, target_id, json.dumps(days), time_hm, int(enabled), now),
+        )
+        await db.commit()
+        return await get_auto_trigger(cur.lastrowid)
+
+
+async def update_auto_trigger(trigger_id: int, name: str, type: str, target_id: str,
+                              days: list, time_hm: str, enabled: bool):
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(
+            "UPDATE auto_triggers SET name=?, type=?, target_id=?, days=?, time_hm=?, enabled=? WHERE id=?",
+            (name, type, target_id, json.dumps(days), time_hm, int(enabled), trigger_id),
+        )
+        await db.commit()
+
+
+async def delete_auto_trigger(trigger_id: int):
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute("DELETE FROM auto_triggers WHERE id = ?", (trigger_id,))
+        await db.commit()
+
+
+async def touch_auto_trigger(trigger_id: int):
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(
+            "UPDATE auto_triggers SET last_run = ? WHERE id = ?",
+            (datetime.utcnow().isoformat(), trigger_id),
         )
         await db.commit()
 
