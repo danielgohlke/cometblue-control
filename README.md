@@ -219,6 +219,39 @@ pip install -e ".[mcp,dev]"       # + dev/test tools
 
 ---
 
+## Uninstall
+
+```bash
+./uninstall.sh
+```
+
+Removes the install directory and (on Linux/Pi) the systemd service / (on macOS) the launchd agent. Config is kept by default.
+
+| Option | Effect |
+|--------|--------|
+| *(none)* | Remove install dir + service; keep `~/.cometblue` |
+| `--purge` | Also delete `~/.cometblue` (config, profiles, DB, logs) |
+| `--install-dir=DIR` | Override the install directory to remove |
+| `--yes` / `-y` | Skip confirmation prompt |
+
+**Examples:**
+
+```bash
+# Normal uninstall (keeps config)
+./uninstall.sh
+
+# Full removal including config
+./uninstall.sh --purge
+
+# Custom install directory
+./uninstall.sh --install-dir=/home/myuser/cometblue-control
+
+# Non-interactive (e.g. in a script)
+./uninstall.sh --purge --yes
+```
+
+---
+
 ## Quick Start
 
 ```bash
@@ -765,6 +798,7 @@ cometblue-control/
 ├── install-macos.sh         macOS installer (optional launchd)
 ├── install-linux.sh         Linux installer (apt/dnf/pacman, optional systemd)
 ├── install-raspberry.sh     Raspberry Pi installer (systemd, rfkill fix, Pi 3B+ tuning)
+├── uninstall.sh             Uninstaller for all platforms
 └── pyproject.toml           Package definition
 ```
 
