@@ -2575,15 +2575,36 @@ function app() {
 
     async _waitForPollComplete() {
       const maxWait = 300_000; // 5 min ceiling
-      const interval = 2_000;
+      const interval = 1_500;
       const start = Date.now();
-      while (Date.now() - start < maxWait) {
-        await new Promise(r => setTimeout(r, interval));
-        try {
-          const r = await fetch(`${API}/api/devices/poll-all-status`);
-          const s = await r.json();
-          if (!s.running) return;
-        } catch { /* network hiccup — keep waiting */ }
+      let prevDevice = null;
+      try {
+        while (Date.now() - start < maxWait) {
+          await new Promise(r => setTimeout(r, interval));
+          try {
+            const r = await fetch(`${API}/api/devices/poll-all-status`);
+            const s = await r.json();
+            const cur = s.current_device || null;
+            // Update pollingDevices so dashboard/devices tab shows spinner
+            if (prevDevice && prevDevice !== cur) {
+              const d = {...this.pollingDevices};
+              delete d[prevDevice];
+              this.pollingDevices = d;
+            }
+            if (cur && cur !== prevDevice) {
+              this.pollingDevices = {...this.pollingDevices, [cur]: true};
+            }
+            prevDevice = cur;
+            if (!s.running) return;
+          } catch { /* network hiccup — keep waiting */ }
+        }
+      } finally {
+        // Always clean up any lingering spinner
+        if (prevDevice) {
+          const d = {...this.pollingDevices};
+          delete d[prevDevice];
+          this.pollingDevices = d;
+        }
       }
     },
 

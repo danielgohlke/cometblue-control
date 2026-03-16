@@ -25,11 +25,13 @@ _adapter: Optional[str] = None
 _poll_running: bool = False
 _poll_started_at: Optional[datetime] = None
 _poll_completed_at: Optional[datetime] = None
+_current_polling_address: Optional[str] = None
 
 
 def get_poll_state() -> dict:
     return {
         "running": _poll_running,
+        "current_device": _current_polling_address,
         "started_at": _poll_started_at.isoformat() if _poll_started_at else None,
         "completed_at": _poll_completed_at.isoformat() if _poll_completed_at else None,
     }
@@ -150,23 +152,26 @@ async def _poll_all_linux(devices: list):
 
 
 async def _poll_single(address: str):
+    global _current_polling_address
     device = await db.get_device(address)
     if not device:
         return
     pin = device.get("pin")
     mac_address = device.get("mac_address")
+    _current_polling_address = address
     log.debug("Polling %s...", address)
-    result = await poll_device(address, pin=pin, adapter=_adapter, mac_address=mac_address)
-
-    # Handle auto-resolved address (UUID changed after battery replacement)
-    new_address = result.get("new_address")
-    if new_address:
-        log.info("Auto-resolved address for device: %s → %s", address, new_address)
-        await db.update_device_address(address, new_address)
-        effective_address = new_address
-    else:
-        effective_address = address
-
-    await db.save_status(effective_address, result)
-    await db.update_device_seen(effective_address)
-    log.debug("Poll complete for %s: %s", effective_address, result.get("error") or "ok")
+    try:
+        result = await poll_device(address, pin=pin, adapter=_adapter, mac_address=mac_address)
+        # Handle auto-resolved address (UUID changed after battery replacement)
+        new_address = result.get("new_address")
+        if new_address:
+            log.info("Auto-resolved address for device: %s → %s", address, new_address)
+            await db.update_device_address(address, new_address)
+            effective_address = new_address
+        else:
+            effective_address = address
+        await db.save_status(effective_address, result)
+        await db.update_device_seen(effective_address)
+        log.debug("Poll complete for %s: %s", effective_address, result.get("error") or "ok")
+    finally:
+        _current_polling_address = None
