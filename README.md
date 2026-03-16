@@ -18,6 +18,7 @@ Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI �
 - **Full thermostat control** — temperatures, weekly schedules, holiday slots, time sync
 - **Child lock control** — toggle per device or bulk-set all devices at once; optionally part of a profile
 - **Background polling** — regularly reads all configured devices (configurable interval, on/off toggle persisted in DB)
+- **Poll safety** — auto-poll and manual polls are mutually exclusive; a running poll is always visible in the UI with a per-device progress indicator
 - **Alert system** — banner warnings for low battery, connection errors, and devices not yet polled
 - **Heating profiles** — Winter, Summer, Spring, Holiday, Aus, Weekend, Weekday; optional child lock per profile
 - **Scenes (Szenen/Presets)** — assign different profiles to different devices, save as named scenes, apply all at once with live progress
@@ -242,7 +243,7 @@ Start the server and open **http://localhost:8080**.
 ### Nav bar
 
 - **Auto-poll toggle** — enable/disable background polling (persisted in DB)
-- **Poll all button** — trigger an immediate poll of all devices
+- **Poll all button** — triggers an immediate BLE poll of all devices sequentially; the spinner and loading bar move to each device card as it is being polled; auto-poll is blocked while a manual poll is running and vice versa
 - **Alert badge** — shows count of active alerts (low battery, errors, unpolled devices)
 
 ### Alert banner
@@ -286,10 +287,12 @@ GET    /api/devices/{address}                Get device details
 PATCH  /api/devices/{address}                Update device (name, pin, adapter)
 DELETE /api/devices/{address}                Remove device (history is kept)
 GET    /api/devices/{address}/status         Latest cached status (instant)
-POST   /api/devices/{address}/poll           Trigger immediate BLE poll
+POST   /api/devices/{address}/poll           Trigger immediate BLE poll (409 if poll already running)
 POST   /api/devices/{address}/reset          Clear cached status + history for device
 PATCH  /api/devices/{address}/flags          Set child lock (and other flags)
 POST   /api/devices/set-child-lock           Bulk set child lock on all or specific devices
+POST   /api/devices/poll-all                 Trigger background poll of all devices (202 Accepted)
+GET    /api/devices/poll-all-status          Poll state: {running, current_device, started_at, completed_at}
 ```
 
 **Bulk child lock example:**
@@ -678,6 +681,16 @@ Example: `07:00–22:00` → start = 42, end = 132.
 
 Before accessing protected characteristics (temperatures, schedules, flags), write the PIN as a 4-byte little-endian integer to suffix `ee30`. Example: PIN `1234` (decimal) → bytes `D2 04 00 00`.
 
+### Platform-specific BLE behaviour
+
+| Platform | BLE stack | Addressing | Connect timeout | Poll order |
+|----------|-----------|------------|-----------------|------------|
+| macOS | CoreBluetooth | Random UUID (per Mac) | 15 s | Sequential |
+| Linux | BlueZ (D-Bus) | MAC address | 45 s | Sequential |
+| Raspberry Pi | BlueZ + dbus-fast | MAC address | 45 s | Sequential |
+
+On macOS the `adapter` parameter is ignored (CoreBluetooth manages adapters transparently). On Linux/Pi `hci0` (or another adapter) can be set in `config.yaml → bluetooth.adapter`. The BLE lock ensures only one GATT connection is open at a time on every platform.
+
 ### Device addressing on macOS
 
 On macOS, CoreBluetooth does **not** expose real Bluetooth MAC addresses. Instead it assigns a random UUID per device that is stable per Mac but changes after a battery replacement.
@@ -759,6 +772,11 @@ Deleting a device only removes it from the `devices` table — history and statu
 - The thermostat only allows one connection at a time — wait a few seconds and retry
 - If another app (e.g. the official CometBlue app) has an open connection, close it first
 - Try increasing the connection timeout in `config.yaml`
+
+**"Poll already running" / Poll button disabled**
+- A manual poll (single or poll-all) and the auto-poll scheduler are mutually exclusive
+- Wait for the current poll to finish — the spinner on each device card shows progress
+- The poll-all button stays active with a spinner until all devices have been polled
 
 **Wrong PIN / auth failed**
 - The PIN can be set offline in the device edit modal (saved to DB without connecting)
