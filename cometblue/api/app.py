@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     cfg = config.get()
     await db.init_db()
     scheduler.init(
-        poll_interval=cfg.get("poll_interval", 300),
+        poll_interval=cfg.get("poll_interval", 900),
         adapter=cfg.get("bluetooth", {}).get("adapter"),
     )
     auto_trigger.init(scheduler._scheduler)
@@ -75,7 +75,7 @@ def create_app() -> FastAPI:
         return {
             "status": "ok",
             "devices": len(devices_list),
-            "poll_interval": cfg.get("poll_interval", 300),
+            "poll_interval": cfg.get("poll_interval", 900),
             "next_poll": scheduler.get_next_run(),
             "auto_poll": auto_poll,
         }

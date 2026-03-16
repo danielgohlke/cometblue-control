@@ -5,10 +5,13 @@
 host: "0.0.0.0"
 port: 8080
 
-# Polling interval in seconds
-# Note: on Raspberry Pi 3B+, each device takes ~45s (slow GATT service discovery).
-# With 7 devices allow at least 7 * 50s = 350s between polls.
-poll_interval: 600
+# Polling interval in seconds (minimum recommended: 900 = 15 minutes)
+# WARNING: CometBlue devices have a firmware bug — polling too frequently causes
+# them to freeze/stop responding. The battery must then be removed and reinserted
+# to recover the device. Recommended: 900s (15 min) or more.
+# On Raspberry Pi 3B+, each device takes ~45s (slow GATT service discovery).
+# With 7 devices allow at least 7 * 50s = 350s absolute minimum.
+poll_interval: 900
 
 bluetooth:
   # Bluetooth adapter (null = system default, e.g. "hci0" on Linux)

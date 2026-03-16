@@ -64,6 +64,14 @@
         </label>
         <span x-show="autoPoll" class="text-xs text-yellow-300 opacity-80" :title="t('autopoll_battery_tooltip')">🔋⚠</span>
       </div>
+      <!-- Settings gear -->
+      <button @click="openSettings()" :title="t('nav_title_settings')"
+        class="opacity-60 hover:opacity-100 transition-opacity">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </button>
       <button @click="setLang(lang === 'de' ? 'en' : 'de')"
         :title="lang === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'"
         class="text-xs px-2 py-0.5 rounded font-mono transition-all opacity-60 hover:opacity-100 hover:bg-blue-800"
@@ -742,6 +750,39 @@
 
 <!-- ═══════════════════════════ MODALS ═══════════════════════════ -->
 
+<!-- Settings Modal -->
+<div x-show="showSettingsModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showSettingsModal=false">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <h2 class="text-lg font-bold mb-4" x-text="t('settings_title')"></h2>
+
+    <!-- Poll interval -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1" x-text="t('settings_poll_label')"></label>
+      <div class="flex items-center gap-2">
+        <input type="number" x-model.number="settingsPollMinutes" min="15" max="360" step="5"
+          class="border rounded px-3 py-1.5 w-24 text-sm">
+        <span class="text-sm text-gray-500" x-text="t('settings_minutes')"></span>
+      </div>
+      <p class="text-xs text-gray-400 mt-1" x-text="t('settings_poll_hint')"></p>
+    </div>
+
+    <!-- Firmware warning -->
+    <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-5 flex gap-2">
+      <span class="text-red-500 text-lg flex-shrink-0">⚠️</span>
+      <p class="text-xs text-red-700 leading-snug" x-text="t('settings_firmware_warn')"></p>
+    </div>
+
+    <div class="flex gap-3">
+      <button @click="saveSettings()"
+        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+        x-text="t('settings_save')"></button>
+      <button @click="showSettingsModal=false"
+        class="flex-1 border border-gray-300 text-gray-700 text-sm py-2 rounded-lg hover:bg-gray-50 transition-colors"
+        x-text="t('btn_cancel')"></button>
+    </div>
+  </div>
+</div>
+
 <!-- Set Temperature -->
 <div x-show="showSetTemp" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showSetTemp=false">
   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
@@ -1364,6 +1405,14 @@ const TRANSLATIONS = {
     nav_title_poll: 'Alle Geräte sofort abfragen',
     nav_title_autopoll: 'Automatisches Polling ein-/ausschalten',
     autopoll_battery_tooltip: 'Auto-Poll aktiv — jede Abfrage verbraucht Batterie der Thermostate. Nur aktivieren wenn nötig.',
+    nav_title_settings: 'Einstellungen',
+    settings_title: 'Einstellungen',
+    settings_poll_label: 'Poll-Intervall',
+    settings_minutes: 'Minuten',
+    settings_poll_hint: 'Minimum empfohlen: 15 Minuten',
+    settings_firmware_warn: 'Firmware-Einschränkung: Zu häufige Abfragen können CometBlue-Geräte einfrieren lassen. Das Gerät reagiert dann nicht mehr und muss durch Herausnehmen und Wiedereinlegen der Batterie zurückgesetzt werden. Empfohlen: 15 Minuten oder mehr.',
+    settings_save: 'Speichern',
+    settings_saved: 'Einstellungen gespeichert',
     nav_title_debug: 'Debug-Modus',
     nav_tab_dashboard: 'Dashboard',
     nav_tab_monitor: 'Monitor',
@@ -1673,6 +1722,14 @@ const TRANSLATIONS = {
     nav_title_poll: 'Poll all devices now',
     nav_title_autopoll: 'Toggle automatic polling',
     autopoll_battery_tooltip: 'Auto-Poll active — each poll drains the thermostat batteries. Only enable if needed.',
+    nav_title_settings: 'Settings',
+    settings_title: 'Settings',
+    settings_poll_label: 'Poll Interval',
+    settings_minutes: 'minutes',
+    settings_poll_hint: 'Minimum recommended: 15 minutes',
+    settings_firmware_warn: 'Firmware limitation: Polling too frequently can freeze CometBlue devices. The device stops responding and must be reset by removing and reinserting the battery. Recommended: 15 minutes or more.',
+    settings_save: 'Save',
+    settings_saved: 'Settings saved',
     nav_title_debug: 'Debug mode',
     nav_tab_dashboard: 'Dashboard',
     nav_tab_monitor: 'Monitor',
@@ -2017,6 +2074,8 @@ function app() {
     busyDevices: {},
     debugMode: false,
     autoPoll: false,
+    showSettingsModal: false,
+    settingsPollMinutes: 15,
 
     // Assign discovered device modal
     showAssignModal: false,
@@ -2420,6 +2479,23 @@ function app() {
     async loadStatus() {
       this.status = await fetch(`${API}/api/status`).then(r => r.json()).catch(() => ({}));
       if (typeof this.status.auto_poll === 'boolean') this.autoPoll = this.status.auto_poll;
+      if (this.status.poll_interval) this.settingsPollMinutes = Math.round(this.status.poll_interval / 60);
+    },
+
+    openSettings() {
+      this.showSettingsModal = true;
+    },
+
+    async saveSettings() {
+      const seconds = this.settingsPollMinutes * 60;
+      await fetch(`${API}/api/settings/poll-interval`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({poll_interval: seconds}),
+      });
+      await this.loadStatus();
+      this.showSettingsModal = false;
+      this.showToast(this.t('settings_saved'));
     },
 
     async toggleAutoPoll() {

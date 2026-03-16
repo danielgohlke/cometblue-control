@@ -109,7 +109,7 @@ The Raspberry Pi installer automatically:
 - Unblocks Bluetooth via rfkill
 - Adds your user to the `bluetooth` group
 - Installs and starts the systemd service
-- Sets `poll_interval: 600` (Pi 3B+ needs ~45s per device)
+- Sets `poll_interval: 900` (recommended 15 min; Pi 3B+ needs ~45s per device)
 
 > **Notes:**
 > Each device takes ~45s to poll on Pi 3B+ (GATT service discovery).
@@ -158,7 +158,7 @@ The config file is created at `~/.cometblue/config.yaml` on first run. Edit it t
 ```yaml
 host: "0.0.0.0"
 port: 8080               # change port here, or use: cometblue-control serve --port 9000
-poll_interval: 300       # seconds between polls (default: 5 min)
+poll_interval: 900       # seconds between polls (default: 15 min — see warning below)
 
 bluetooth:
   adapter: null          # null = system default, or "hci0" on Linux
@@ -170,9 +170,11 @@ ui:
 log_level: "INFO"
 ```
 
-Runtime settings (e.g. `auto_poll`) are stored in the database and survive restarts. They can be toggled from the Web UI nav bar or via the settings API.
+Runtime settings (e.g. `auto_poll`, `poll_interval`) are stored in the database and survive restarts. They can be changed via the ⚙ settings button in the Web UI nav bar or via the settings API.
 
-> **Battery note:** Auto-poll is **disabled by default**. Each BLE poll connects to the thermostat and wakes it up, which consumes battery. Enable it only if you need continuous monitoring — and consider a longer `poll_interval` (600s or more) to reduce wear.
+> **Battery note:** Auto-poll is **disabled by default**. Each BLE poll connects to the thermostat and wakes it up, which consumes battery. Enable it only if you need continuous monitoring.
+
+> ⚠️ **Firmware bug — device freeze:** CometBlue thermostats have a known firmware bug where polling too frequently causes the device to stop responding entirely. The only recovery is to **remove and reinsert the battery**. The recommended poll interval is **15 minutes (900 s) or more**. The Web UI enforces a minimum of 15 minutes when changed via settings.
 
 ### Profiles
 
