@@ -249,6 +249,8 @@ async def poll_device(address: str):
     device = await db.get_device(address)
     if not device:
         raise HTTPException(404, "Device not found")
-    await trigger_poll_now(address)
+    started = await trigger_poll_now(address)
+    if not started:
+        raise HTTPException(409, "A poll is already in progress — please wait")
     status = await db.get_status(address)
     return status or {"address": address, "polled_at": None}

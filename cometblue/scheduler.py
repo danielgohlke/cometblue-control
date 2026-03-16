@@ -73,23 +73,46 @@ def get_next_run() -> Optional[str]:
     return None
 
 
-async def trigger_poll_now(address: Optional[str] = None):
-    """Immediately poll one or all devices (always runs, ignores auto_poll setting)."""
+async def trigger_poll_now(address: Optional[str] = None) -> bool:
+    """Immediately poll one device or all devices.
+
+    Returns False (without polling) if any poll is already in progress —
+    prevents manual and auto-polls from running simultaneously.
+    Ignores the auto_poll setting (manual trigger always runs).
+    """
+    global _poll_running, _poll_started_at, _poll_completed_at
+    if _poll_running:
+        log.info("Poll already in progress — skipping trigger for %s", address or "all")
+        return False
     if address:
-        await _poll_single(address)
+        # Single-device manual poll: guard with _poll_running so the scheduler
+        # skips its next fire while this is running.
+        _poll_running = True
+        _poll_started_at = datetime.now(timezone.utc)
+        per_device_timeout = 30 if IS_MACOS else 120
+        try:
+            await asyncio.wait_for(_poll_single(address), timeout=per_device_timeout)
+        except asyncio.TimeoutError:
+            log.error("Manual poll timed out (>%ds) for %s", per_device_timeout, address)
+        except Exception as e:
+            log.error("Manual poll error for %s: %s", address, e)
+        finally:
+            _poll_running = False
+            _poll_completed_at = datetime.now(timezone.utc)
     else:
-        await _poll_all_devices(manual=True)
+        await _poll_all_devices()
+    return True
 
 
 async def _scheduled_poll():
-    """Called by the scheduler — respects the auto_poll setting."""
+    """Called by the scheduler — respects auto_poll setting and running guard."""
     if await db.get_setting("auto_poll", "true") != "true":
         log.debug("Auto-poll disabled, skipping scheduled poll")
         return
-    await _poll_all_devices(manual=False)
+    await _poll_all_devices()
 
 
-async def _poll_all_devices(manual: bool = False):
+async def _poll_all_devices():
     global _poll_running, _poll_started_at, _poll_completed_at
     if _poll_running:
         log.debug("Poll already running, skipping")
