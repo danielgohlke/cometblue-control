@@ -12,7 +12,11 @@ from .. import models
 from ... import config, database as db
 from ...device import CometBlueDevice
 from ...discovery import find_by_mac
-from ...scheduler import trigger_poll_now
+from ...scheduler import trigger_poll_now, is_poll_running, get_poll_state
+
+# Keep strong references to background tasks so they are not garbage-collected
+# before completion (asyncio only keeps weak refs to tasks by default).
+_background_tasks: set = set()
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
@@ -223,10 +227,20 @@ async def rediscover_device(address: str):
     return {"status": "updated", "old_address": old_address, "new_address": new_address, "mac": mac}
 
 
+@router.get("/poll-all-status")
+async def poll_all_status():
+    """Return the current poll-all state (running / last completed)."""
+    return get_poll_state()
+
+
 @router.post("/poll-all", status_code=202)
 async def poll_all_devices():
     """Trigger a background poll of all devices. Returns immediately."""
-    asyncio.create_task(trigger_poll_now())
+    if is_poll_running():
+        return {"status": "already_running"}
+    task = asyncio.create_task(trigger_poll_now())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     return {"status": "triggered"}
 
 

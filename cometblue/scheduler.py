@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -16,6 +17,23 @@ log = logging.getLogger(__name__)
 
 _scheduler: Optional[AsyncIOScheduler] = None
 _adapter: Optional[str] = None
+
+# Poll state — used by the UI to wait for background poll completion
+_poll_running: bool = False
+_poll_started_at: Optional[datetime] = None
+_poll_completed_at: Optional[datetime] = None
+
+
+def get_poll_state() -> dict:
+    return {
+        "running": _poll_running,
+        "started_at": _poll_started_at.isoformat() if _poll_started_at else None,
+        "completed_at": _poll_completed_at.isoformat() if _poll_completed_at else None,
+    }
+
+
+def is_poll_running() -> bool:
+    return _poll_running
 
 
 def init(poll_interval: int = 300, adapter: Optional[str] = None):
@@ -59,6 +77,10 @@ async def trigger_poll_now(address: Optional[str] = None):
 
 
 async def _poll_all_devices():
+    global _poll_running, _poll_started_at, _poll_completed_at
+    if _poll_running:
+        log.debug("Poll already running, skipping")
+        return
     if await db.get_setting("auto_poll", "true") != "true":
         log.debug("Auto-poll disabled, skipping scheduled poll")
         return
@@ -66,17 +88,26 @@ async def _poll_all_devices():
     if not devices:
         log.debug("No devices configured, skipping poll")
         return
+
+    _poll_running = True
+    _poll_started_at = datetime.now(timezone.utc)
     log.info("Polling %d device(s)...", len(devices))
+
     # Poll sequentially — BLE adapter can only handle one connection at a time.
     # A hard per-device timeout prevents one stuck device from blocking the rest.
     per_device_timeout = 120  # generous: connect(45s) + reads + EOFError reset(10s)
-    for device in devices:
-        try:
-            await asyncio.wait_for(_poll_single(device["address"]), timeout=per_device_timeout)
-        except asyncio.TimeoutError:
-            log.error("Poll timed out (>%ds) for %s — skipping", per_device_timeout, device["address"])
-        except Exception as e:
-            log.error("Unexpected error in poll cycle for %s: %s", device["address"], e)
+    try:
+        for device in devices:
+            try:
+                await asyncio.wait_for(_poll_single(device["address"]), timeout=per_device_timeout)
+            except asyncio.TimeoutError:
+                log.error("Poll timed out (>%ds) for %s — skipping", per_device_timeout, device["address"])
+            except Exception as e:
+                log.error("Unexpected error in poll cycle for %s: %s", device["address"], e)
+    finally:
+        _poll_running = False
+        _poll_completed_at = datetime.now(timezone.utc)
+        log.info("Poll cycle complete")
 
 
 async def _poll_single(address: str):

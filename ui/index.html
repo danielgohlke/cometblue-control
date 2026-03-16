@@ -1434,7 +1434,7 @@ const TRANSLATIONS = {
     toast_rediscover_err: 'Fehler beim Suchen',
     toast_uuid_unchanged: 'Gerät gefunden — UUID unverändert',
     toast_poll_done: 'Poll abgeschlossen',
-    toast_poll_all_done: 'Poll gestartet…',
+    toast_poll_all_done: 'Alle Geräte abgefragt.',
     toast_apply_err: 'Fehler beim Anwenden.',
     toast_childlock_on: 'aktiviert',
     toast_childlock_off: 'deaktiviert',
@@ -1709,7 +1709,7 @@ const TRANSLATIONS = {
     toast_rediscover_err: 'Error searching',
     toast_uuid_unchanged: 'Device found — UUID unchanged',
     toast_poll_done: 'Poll complete',
-    toast_poll_all_done: 'Polling started…',
+    toast_poll_all_done: 'All devices polled.',
     toast_apply_err: 'Error applying.',
     toast_childlock_on: 'enabled',
     toast_childlock_off: 'disabled',
@@ -2558,12 +2558,32 @@ function app() {
       if (this.pollingAll) return;
       this.pollingAll = true;
       try {
-        // Fire-and-forget: server polls all devices in background, returns immediately.
-        // Results arrive via the 30s auto-refresh.
-        await fetch(`${API}/api/devices/poll-all`, {method: 'POST'}).catch(() => null);
+        const res = await fetch(`${API}/api/devices/poll-all`, {method: 'POST'}).catch(() => null);
+        if (!res) return;
+        const body = await res.json().catch(() => ({}));
+        if (body.status === 'already_running') {
+          // Already running — just wait for it
+        }
+        // Wait for the background poll to complete, then reload
+        await this._waitForPollComplete();
+        await this.loadDevices();
         this.showToast(this.t('toast_poll_all_done'));
       } finally {
         this.pollingAll = false;
+      }
+    },
+
+    async _waitForPollComplete() {
+      const maxWait = 300_000; // 5 min ceiling
+      const interval = 2_000;
+      const start = Date.now();
+      while (Date.now() - start < maxWait) {
+        await new Promise(r => setTimeout(r, interval));
+        try {
+          const r = await fetch(`${API}/api/devices/poll-all-status`);
+          const s = await r.json();
+          if (!s.running) return;
+        } catch { /* network hiccup — keep waiting */ }
       }
     },
 
