@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from datetime import datetime, timezone
 from typing import Optional
+
+IS_MACOS = sys.platform == "darwin"
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -91,23 +94,54 @@ async def _poll_all_devices():
 
     _poll_running = True
     _poll_started_at = datetime.now(timezone.utc)
-    log.info("Polling %d device(s)...", len(devices))
+    log.info("Polling %d device(s) [platform=%s]...", len(devices), sys.platform)
 
-    # Poll sequentially — BLE adapter can only handle one connection at a time.
-    # A hard per-device timeout prevents one stuck device from blocking the rest.
-    per_device_timeout = 120  # generous: connect(45s) + reads + EOFError reset(10s)
     try:
-        for device in devices:
-            try:
-                await asyncio.wait_for(_poll_single(device["address"]), timeout=per_device_timeout)
-            except asyncio.TimeoutError:
-                log.error("Poll timed out (>%ds) for %s — skipping", per_device_timeout, device["address"])
-            except Exception as e:
-                log.error("Unexpected error in poll cycle for %s: %s", device["address"], e)
+        if IS_MACOS:
+            await _poll_all_macos(devices)
+        else:
+            await _poll_all_linux(devices)
     finally:
         _poll_running = False
         _poll_completed_at = datetime.now(timezone.utc)
         log.info("Poll cycle complete")
+
+
+async def _poll_all_macos(devices: list):
+    """macOS: CoreBluetooth handles concurrent connections — poll all in parallel.
+
+    The _ble_lock semaphore in device.py still serialises the actual GATT
+    operations (CometBlue only accepts one connection at a time), but asyncio
+    scheduling is more responsive and errors surface faster than sequential.
+    Per-device timeout is shorter because CoreBluetooth service discovery is fast.
+    """
+    per_device_timeout = 30  # connect(15s) + reads
+    async def _safe_poll(address: str):
+        try:
+            await asyncio.wait_for(_poll_single(address), timeout=per_device_timeout)
+        except asyncio.TimeoutError:
+            log.error("Poll timed out (>%ds) for %s — skipping", per_device_timeout, address)
+        except Exception as e:
+            log.error("Unexpected error polling %s: %s", address, e)
+
+    await asyncio.gather(*[_safe_poll(d["address"]) for d in devices])
+
+
+async def _poll_all_linux(devices: list):
+    """Linux / Raspberry Pi: BlueZ only supports one BLE operation at a time.
+
+    Poll strictly sequentially with a generous per-device timeout to prevent
+    one stuck device from blocking the rest.
+    Pi 3B+ needs ~45s connect + ~30s GATT service discovery on first connect.
+    """
+    per_device_timeout = 120  # connect(45s) + reads + EOFError reset(10s)
+    for device in devices:
+        try:
+            await asyncio.wait_for(_poll_single(device["address"]), timeout=per_device_timeout)
+        except asyncio.TimeoutError:
+            log.error("Poll timed out (>%ds) for %s — skipping", per_device_timeout, device["address"])
+        except Exception as e:
+            log.error("Unexpected error polling %s: %s", device["address"], e)
 
 
 async def _poll_single(address: str):
