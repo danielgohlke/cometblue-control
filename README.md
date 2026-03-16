@@ -2,6 +2,13 @@
 
 Cross-platform management system for **CometBlue / Comet Blue**, **Xavax Hama**, and **Sygonix HT100 BT** Bluetooth Low Energy radiator thermostats. Runs on macOS, Linux, and Raspberry Pi.
 
+[![REST API](https://img.shields.io/badge/REST_API-FastAPI-009688?style=for-the-badge&logo=fastapi)](docs/api.md)
+[![MCP Server](https://img.shields.io/badge/MCP_Server-Claude_AI-7C3AED?style=for-the-badge&logo=anthropic)](docs/mcp.md)
+[![Web UI](https://img.shields.io/badge/Web_UI-Alpine.js_+_Tailwind-38BDF8?style=for-the-badge&logo=tailwindcss)](docs/screenshots/dashboard.png)
+[![Platform](https://img.shields.io/badge/Platform-macOS_·_Linux_·_RPi-333333?style=for-the-badge&logo=linux)](README.md)
+
+> **REST API** · **Web UI** · **MCP Server (AI)** · **CLI** — all from a single Python package.
+
 ![Dashboard](docs/screenshots/dashboard.png)
 
 | Monitor | Profile |
