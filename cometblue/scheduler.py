@@ -45,7 +45,7 @@ def init(poll_interval: int = 300, adapter: Optional[str] = None):
     _adapter = adapter
     _scheduler = AsyncIOScheduler()
     _scheduler.add_job(
-        _poll_all_devices,
+        _scheduled_poll,
         trigger=IntervalTrigger(seconds=poll_interval),
         id="poll_all",
         name="Poll all CometBlue devices",
@@ -72,20 +72,25 @@ def get_next_run() -> Optional[str]:
 
 
 async def trigger_poll_now(address: Optional[str] = None):
-    """Immediately poll one or all devices."""
+    """Immediately poll one or all devices (always runs, ignores auto_poll setting)."""
     if address:
         await _poll_single(address)
     else:
-        await _poll_all_devices()
+        await _poll_all_devices(manual=True)
 
 
-async def _poll_all_devices():
+async def _scheduled_poll():
+    """Called by the scheduler — respects the auto_poll setting."""
+    if await db.get_setting("auto_poll", "true") != "true":
+        log.debug("Auto-poll disabled, skipping scheduled poll")
+        return
+    await _poll_all_devices(manual=False)
+
+
+async def _poll_all_devices(manual: bool = False):
     global _poll_running, _poll_started_at, _poll_completed_at
     if _poll_running:
         log.debug("Poll already running, skipping")
-        return
-    if await db.get_setting("auto_poll", "true") != "true":
-        log.debug("Auto-poll disabled, skipping scheduled poll")
         return
     devices = await db.list_devices(active_only=True)
     if not devices:
