@@ -525,16 +525,33 @@ Replace `/path/to/cometblue-control` with the actual install path (e.g. `~/.come
 list my cometblue devices
 ```
 
-Expected output (addresses are anonymized):
+Expected output (addresses anonymized):
 
 ```
-┌─────────────────────┬──────────────┬────────┬─────────┬────────┐
-│        Name         │ Current Temp │ Manual │ Battery │ Status │
-├─────────────────────┼──────────────┼────────┼─────────┼────────┤
-│ Wohnzimmer Links    │ 20.5°C       │ 18.0°C │ 78%     │ OK     │
-│ Wohnzimmer Rechts   │ 20.0°C       │ 18.0°C │ 71%     │ OK     │
-│ Schlafzimmer        │ 19.5°C       │ 18.0°C │ 78%     │ OK     │
-└─────────────────────┴──────────────┴────────┴─────────┴────────┘
+⏺ cometblue - list_devices (MCP)
+
+⏺ Here are your 7 CometBlue devices:
+
+  ┌─────────────────────┬──────────────┬────────┬─────────┬───────────────────┐
+  │        Name         │ Current Temp │ Manual │ Battery │      Status       │
+  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
+  │ Bad                 │ 20.5°C       │ 18.0°C │ 29%     │ Error (not found) │
+  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
+  │ Kinderzimmer Links  │ 18.5°C       │ 18.0°C │ 65%     │ Error (not found) │
+  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
+  │ Kinderzimmer Rechts │ 18.5°C       │ 18.0°C │ 66%     │ Timeout           │
+  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
+  │ Küche               │ 17.5°C       │ 18.0°C │ 87%     │ Error (not found) │
+  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
+  │ Schlafzimmer        │ 19.5°C       │ 18.0°C │ 78%     │ OK                │
+  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
+  │ Wohnzimmer Links    │ 20.5°C       │ 18.0°C │ 78%     │ OK                │
+  ├─────────────────────┼──────────────┼────────┼─────────┼───────────────────┤
+  │ Wohnzimmer Rechts   │ 20.0°C       │ 18.0°C │ 71%     │ OK                │
+  └─────────────────────┴──────────────┴────────┴─────────┴───────────────────┘
+
+  Notable: 4 devices have connection errors — they show cached data from
+  their last successful poll. The Bad thermostat also has a low battery at 29%.
 ```
 
 > **Note:** Devices showing "Error (not found)" or "Timeout" display the last cached values — a manual poll or enabling auto-poll will refresh them.
