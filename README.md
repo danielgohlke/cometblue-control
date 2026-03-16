@@ -12,6 +12,39 @@ Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI �
 
 ---
 
+## Screenshots
+
+| Dashboard | Monitor |
+|-----------|---------|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Monitor](docs/screenshots/monitor.png) |
+
+| Heizprofile | Szenarien |
+|-------------|-----------|
+| ![Profiles](docs/screenshots/profiles.png) | ![Szenarien](docs/screenshots/szenarien.png) |
+
+| Zeitplan | Geräte entdecken |
+|----------|-----------------|
+| ![Zeitplan](docs/screenshots/zeitplan.png) | ![Discovery](docs/screenshots/discovery.png) |
+
+<details>
+<summary>Weitere Screenshots (Modals)</summary>
+
+| Temperaturen setzen | Heizzeiten setzen |
+|--------------------|-------------------|
+| ![Set Temp](docs/screenshots/set%20temp%20edit.png) | ![Set Heattime](docs/screenshots/set%20heattime%20edit.png) |
+
+| Profil bearbeiten | Szenario bearbeiten |
+|-------------------|---------------------|
+| ![Edit Profile](docs/screenshots/profil%20edit.png) | ![Edit Scenario](docs/screenshots/scenario%20edit.png) |
+
+| Zeitplan bearbeiten | PIN setzen |
+|--------------------|-----------|
+| ![Edit Timeplan](docs/screenshots/timeplan%20edit.png) | ![Set PIN](docs/screenshots/set%20pin%20edit.png) |
+
+</details>
+
+---
+
 ## Features
 
 - **Automatic BLE discovery** — scans and identifies CometBlue devices
@@ -21,7 +54,8 @@ Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI �
 - **Poll safety** — auto-poll and manual polls are mutually exclusive; a running poll is always visible in the UI with a per-device progress indicator
 - **Alert system** — banner warnings for low battery, connection errors, and devices not yet polled
 - **Heating profiles** — Winter, Summer, Spring, Holiday, Aus, Weekend, Weekday; optional child lock per profile
-- **Scenes (Szenen/Presets)** — assign different profiles to different devices, save as named scenes, apply all at once with live progress
+- **Scenarios (Szenarien/Presets)** — assign different profiles to different devices, save as named scenarios, apply all at once with live progress
+- **Scheduler (Zeitplan)** — automatically apply scenarios or profiles on a schedule (time + days of week)
 - **Temperature history / monitoring** — chart with dual Y-axis (temperature + battery)
 - **REST API** — complete OpenAPI-documented HTTP API with SSE streaming for long-running operations
 - **Web UI** — single-page dashboard (Alpine.js + Tailwind, no build step required)
@@ -87,11 +121,60 @@ cd cometblue-control
 # With MCP server support:
 ./install-linux.sh --with-mcp
 
-# With systemd auto-start:
+# With systemd auto-start (installs to /opt/cometblue-control):
 ./install-linux.sh --systemd
+
+# Custom install directory:
+./install-linux.sh --systemd --install-dir=/home/myuser/cometblue-control
 ```
 
 Supports apt (Debian/Ubuntu), dnf (Fedora), and pacman (Arch).
+
+The installer automatically:
+- Installs BlueZ and Python via the system package manager
+- Enables the Bluetooth service
+- Adds your user to the `bluetooth` group
+- Copies files to the install directory and creates a venv
+
+**With `--systemd`:**
+- Installs `/etc/systemd/system/cometblue.service`
+- Enables and starts the service immediately
+
+```bash
+# Service management
+sudo systemctl status cometblue
+sudo systemctl restart cometblue
+sudo systemctl stop cometblue
+
+# Logs (live)
+journalctl -u cometblue -f
+
+# Update: pull changes, then restart
+cd /opt/cometblue-control
+git pull
+source .venv/bin/activate && pip install -e "."
+sudo systemctl restart cometblue
+```
+
+> **Note:** After `./install-linux.sh`, log out and back in for the `bluetooth` group to take effect — otherwise BlueZ may deny BLE access.
+
+#### Manual systemd setup
+
+If you prefer to set up the service manually:
+
+```bash
+# 1. Copy and adapt the unit file
+sudo cp systemd/cometblue.service /etc/systemd/system/
+
+# Edit User=, WorkingDirectory=, ExecStart= to match your setup:
+sudo systemctl edit --force cometblue.service
+
+# 2. Enable and start
+sudo systemctl daemon-reload
+sudo systemctl enable --now cometblue
+```
+
+The unit file (`systemd/cometblue.service`) uses `%i` as a placeholder for the username — replace it with your user or pass it via `systemctl enable cometblue@youruser.service` if you rename it to `cometblue@.service`.
 
 ### Raspberry Pi
 
