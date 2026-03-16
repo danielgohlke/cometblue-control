@@ -1434,6 +1434,7 @@ const TRANSLATIONS = {
     toast_rediscover_err: 'Fehler beim Suchen',
     toast_uuid_unchanged: 'Gerät gefunden — UUID unverändert',
     toast_poll_done: 'Poll abgeschlossen',
+    poll_all_progress: 'Wird abgefragt…',
     toast_poll_all_done: 'Alle Geräte abgefragt.',
     toast_apply_err: 'Fehler beim Anwenden.',
     toast_childlock_on: 'aktiviert',
@@ -1709,6 +1710,7 @@ const TRANSLATIONS = {
     toast_rediscover_err: 'Error searching',
     toast_uuid_unchanged: 'Device found — UUID unchanged',
     toast_poll_done: 'Poll complete',
+    poll_all_progress: 'Polling…',
     toast_poll_all_done: 'All devices polled.',
     toast_apply_err: 'Error applying.',
     toast_childlock_on: 'enabled',
@@ -2575,9 +2577,10 @@ function app() {
 
     async _waitForPollComplete() {
       const maxWait = 300_000; // 5 min ceiling
-      const interval = 1_500;
+      const interval = 1_000;
       const start = Date.now();
       let prevDevice = null;
+      const label = this.t('poll_all_progress');
       try {
         while (Date.now() - start < maxWait) {
           await new Promise(r => setTimeout(r, interval));
@@ -2585,25 +2588,25 @@ function app() {
             const r = await fetch(`${API}/api/devices/poll-all-status`);
             const s = await r.json();
             const cur = s.current_device || null;
-            // Update pollingDevices so dashboard/devices tab shows spinner
+            // Move the busy indicator to the currently-polled device card
             if (prevDevice && prevDevice !== cur) {
-              const d = {...this.pollingDevices};
+              const d = {...this.busyDevices};
               delete d[prevDevice];
-              this.pollingDevices = d;
+              this.busyDevices = d;
             }
             if (cur && cur !== prevDevice) {
-              this.pollingDevices = {...this.pollingDevices, [cur]: true};
+              this.busyDevices = {...this.busyDevices, [cur]: label};
             }
             prevDevice = cur;
             if (!s.running) return;
           } catch { /* network hiccup — keep waiting */ }
         }
       } finally {
-        // Always clean up any lingering spinner
+        // Always clean up the busy indicator, even on timeout or error
         if (prevDevice) {
-          const d = {...this.pollingDevices};
+          const d = {...this.busyDevices};
           delete d[prevDevice];
-          this.pollingDevices = d;
+          this.busyDevices = d;
         }
       }
     },
