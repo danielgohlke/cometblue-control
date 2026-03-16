@@ -57,21 +57,62 @@ All of the following devices share the same BLE protocol and are fully supported
 
 ## Installation
 
-### Quick install (recommended)
+Use the platform-specific installer for your system:
+
+### macOS
 
 ```bash
 git clone https://github.com/danielgohlke/cometblue-control
 cd cometblue-control
-
-# Core + API + Web UI (no extra dependencies needed):
-./install.sh
+./install-macos.sh
 
 # With MCP server support:
-./install.sh --with-mcp
+./install-macos.sh --with-mcp
 
-# On Linux/RPi with systemd auto-start:
-./install.sh --with-mcp --systemd
+# With auto-start at login (launchd):
+./install-macos.sh --launchd
 ```
+
+On first run, macOS will prompt for Bluetooth permission — grant it in
+**System Settings → Privacy & Security → Bluetooth**.
+
+### Linux (x86_64 / generic)
+
+```bash
+git clone https://github.com/danielgohlke/cometblue-control
+cd cometblue-control
+./install-linux.sh
+
+# With MCP server support:
+./install-linux.sh --with-mcp
+
+# With systemd auto-start:
+./install-linux.sh --systemd
+```
+
+Supports apt (Debian/Ubuntu), dnf (Fedora), and pacman (Arch).
+
+### Raspberry Pi ⚠️ Alpha
+
+```bash
+git clone https://github.com/danielgohlke/cometblue-control
+cd cometblue-control
+./install-raspberry.sh
+
+# With MCP server support:
+./install-raspberry.sh --with-mcp
+```
+
+The Raspberry Pi installer automatically:
+- Installs BlueZ and enables Bluetooth
+- Unblocks Bluetooth via rfkill
+- Adds your user to the `bluetooth` group
+- Installs and starts the systemd service
+- Sets `poll_interval: 600` (Pi 3B+ needs ~45s per device)
+
+> **Alpha notes:**
+> Each device takes ~45s to poll on Pi 3B+ (GATT service discovery).
+> If BLE stops working: `sudo systemctl restart cometblue`
 
 ### Manual install
 
@@ -79,7 +120,6 @@ cd cometblue-control
 cd cometblue-control
 python3 -m venv .venv
 source .venv/bin/activate         # Linux/macOS
-# .venv\Scripts\activate          # Windows
 
 pip install -e "."                # core + API + UI
 pip install -e ".[mcp]"           # + MCP server
@@ -481,22 +521,14 @@ cometblue-control mcp
 ## Raspberry Pi Setup
 
 ```bash
-# 1. Install BlueZ
-sudo apt update && sudo apt install -y bluetooth bluez python3 python3-venv git
-
-# 2. Enable Bluetooth
-sudo systemctl enable bluetooth && sudo systemctl start bluetooth
-
-# 3. Clone and install
 git clone https://github.com/danielgohlke/cometblue-control
 cd cometblue-control
-./install.sh --with-mcp --systemd
+./install-raspberry.sh
 
-# 4. Start service
-sudo systemctl start cometblue
+# Check service
 sudo systemctl status cometblue
 
-# 5. View logs
+# View logs
 journalctl -u cometblue -f
 ```
 
@@ -691,7 +723,9 @@ cometblue-control/
 │   └── profiles/            Default heating profiles (winter, summer, spring, holiday, aus, weekend, weekday)
 ├── systemd/
 │   └── cometblue.service    systemd unit file
-├── install.sh               Installation helper
+├── install-macos.sh         macOS installer (optional launchd)
+├── install-linux.sh         Linux installer (apt/dnf/pacman, optional systemd)
+├── install-raspberry.sh     Raspberry Pi installer (systemd, rfkill, alpha)
 └── pyproject.toml           Package definition
 ```
 
