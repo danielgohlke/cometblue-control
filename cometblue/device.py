@@ -347,6 +347,7 @@ class CometBlueDevice:
         self,
         comfort: Optional[float] = None,
         eco: Optional[float] = None,
+        manual: Optional[float] = None,
         offset: float = 0.0,
         window_open: Optional[bool] = None,
         window_minutes: Optional[int] = None,
@@ -354,6 +355,7 @@ class CometBlueDevice:
         data = encode_temperatures(
             comfort=comfort,
             eco=eco,
+            manual=manual,
             offset=offset,
             window_open=window_open,
             window_minutes=window_minutes,

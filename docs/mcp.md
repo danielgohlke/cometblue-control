@@ -210,7 +210,8 @@ Set temperature setpoints via BLE.
 {
   "address": "XXXXXXXX-...",
   "comfort": 22.0,
-  "eco": 17.0
+  "eco": 17.0,
+  "manual": 21.0
 }
 ```
 
@@ -414,6 +415,7 @@ Synchronize the device clock to the current system time.
 
 ```
 Set the Wohnzimmer thermostat to 21°C comfort, 17°C eco
+Set the Wohnzimmer manually to 22°C
 Apply the winter profile to all devices
 What is the current temperature in the Schlafzimmer?
 Show me the heating schedule for Wohnzimmer Links

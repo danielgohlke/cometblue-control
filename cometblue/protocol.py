@@ -108,12 +108,13 @@ def decode_temperatures(data: bytes) -> Temperatures:
 def encode_temperatures(
     comfort: Optional[float] = None,
     eco: Optional[float] = None,
+    manual: Optional[float] = None,
     offset: float = 0.0,
     window_open: Optional[bool] = None,
     window_minutes: Optional[int] = None,
 ) -> bytes:
     """Encode temperature write payload.
-    comfort/eco=None → 0x80 (unchanged).
+    comfort/eco/manual=None → 0x80 (unchanged).
     offset is always written as a real value (never 0x80); caller must supply
     the current offset from cached status when not changing it.
     Both reference implementations (heizung.php, heaterControl.exp) always
@@ -126,7 +127,7 @@ def encode_temperatures(
     return struct.pack(
         "7b",
         -128,                                               # byte 0: current (read-only)
-        -128,                                               # byte 1: manual mode temp (never set from scheduled control)
+        _enc(manual),                                       # byte 1: manual mode temp
         _enc(eco),                                          # byte 2: low setpoint (Absenken)
         _enc(comfort),                                      # byte 3: high setpoint (Heizen)
         int(offset * 2),                                    # byte 4: offset — always a real value
