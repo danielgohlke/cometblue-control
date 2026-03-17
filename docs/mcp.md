@@ -131,37 +131,49 @@ The playbook installs the `mcp` extra (`pip install -e '.[mcp]'`) and deploys a 
 Ask Claude:
 
 ```
-list my cometblue devices
+gebe mir alle informationen über meine heizung
 ```
 
 Expected output:
 
-```
-⏺ cometblue - list_devices (MCP)
+---
 
-⏺ Here are your 7 CometBlue devices:
+## Thermostate (7 Geräte)
 
-  ┌─────────────────────┬──────────────┬─────────┬───────────────────┐
-  │        Name         │ Current Temp │ Battery │      Status       │
-  ├─────────────────────┼──────────────┼─────────┼───────────────────┤
-  │ Bad                 │ 20.5°C       │ 29%     │ Error (not found) │
-  ├─────────────────────┼──────────────┼─────────┼───────────────────┤
-  │ Kinderzimmer Links  │ 18.5°C       │ 65%     │ Error (not found) │
-  ├─────────────────────┼──────────────┼─────────┼───────────────────┤
-  │ Kinderzimmer Rechts │ 18.5°C       │ 66%     │ Timeout           │
-  ├─────────────────────┼──────────────┼─────────┼───────────────────┤
-  │ Küche               │ 17.5°C       │ 87%     │ Error (not found) │
-  ├─────────────────────┼──────────────┼─────────┼───────────────────┤
-  │ Schlafzimmer        │ 19.5°C       │ 78%     │ OK                │
-  ├─────────────────────┼──────────────┼─────────┼───────────────────┤
-  │ Wohnzimmer Links    │ 20.5°C       │ 78%     │ OK                │
-  ├─────────────────────┼──────────────┼─────────┼───────────────────┤
-  │ Wohnzimmer Rechts   │ 20.0°C       │ 71%     │ OK                │
-  └─────────────────────┴──────────────┴─────────┴───────────────────┘
+| Raum | Ist | Soll (manuell) | Comfort | Eco | Batterie | Status |
+|------|-----|----------------|---------|-----|----------|--------|
+| Bad | 21,0°C | 19,0°C | 19,0°C | 18,0°C | 84% | ⚠️ Nicht erreichbar |
+| Comet Blue | 21,0°C | 19,0°C | 19,0°C | 18,0°C | 63% | ✅ OK |
+| Kinderzimmer Links | 20,0°C | 19,0°C | 19,0°C | 18,0°C | 63% | ✅ OK |
+| Kinderzimmer Rechts | 20,0°C | 19,0°C | 19,0°C | 18,0°C | 33% | ⚠️ Nicht erreichbar, Kindersicherung aktiv |
+| Schlafzimmer | 19,5°C | 19,0°C | 19,0°C | 18,0°C | 75% | ✅ OK |
+| Wohnzimmer Links | 20,5°C | 19,0°C | 19,0°C | 18,0°C | 76% | ✅ OK |
+| Wohnzimmer Rechts | 20,0°C | 22,0°C | 19,0°C | 18,0°C | 68% | ✅ OK, Kindersicherung aktiv |
 
-  Notable: 4 devices have connection errors and show cached data from their
-  last successful poll. The Bad thermostat also has a low battery (29%).
-```
+> Letzter Poll: heute 18:05 Uhr. Cache-Daten für nicht erreichbare Geräte.
+
+## Profile (8 verfügbar)
+
+`aus` · `holiday` · `nachts min 17°` · `spring` · `summer` · `weekday` · `weekend` · `winter`
+
+## Szenarien
+
+**"Wohnung"** (ID 1):
+| Raum | Profil |
+|------|--------|
+| Bad | Nachts min 17° |
+| Kinderzimmer Links | Spring |
+| Kinderzimmer Rechts | Aus |
+| Schlafzimmer | Summer |
+| Wohnzimmer Rechts | Spring |
+| Wohnzimmer Links | Aus |
+
+**Hinweise:**
+- 🔋 Kinderzimmer Rechts hat nur noch **33% Batterie** — bald wechseln
+- ⚠️ Bad und Kinderzimmer Rechts sind seit 16:33/16:35 Uhr nicht erreichbar
+- Wohnzimmer Rechts hat noch den manuellen Override auf **22°C** aktiv
+
+---
 
 > Devices with errors display the last cached values. A manual poll or enabling auto-poll will refresh them.
 
