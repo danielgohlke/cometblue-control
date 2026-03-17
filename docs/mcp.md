@@ -2,13 +2,19 @@
 
 CometBlue Control includes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that lets AI assistants like **Claude** control your thermostats directly — reading temperatures, applying profiles, managing schedules, and more.
 
-The MCP server uses **stdio transport** and shares the same SQLite database and BLE stack as the REST API. Both can run simultaneously.
+The MCP server supports two transports:
+- **stdio** — for local use (Claude Code on the same machine)
+- **HTTP/SSE** — for remote use (Claude connecting over the network)
+
+Both share the same SQLite database and BLE stack as the REST API and can run simultaneously.
 
 ---
 
 ## Setup
 
-### Option 1 — Claude Code CLI (recommended)
+### Local (stdio transport)
+
+#### Option 1 — Claude Code CLI (recommended)
 
 ```bash
 claude mcp add cometblue -- /path/to/cometblue-control/.venv/bin/cometblue-control mcp
@@ -23,7 +29,7 @@ Verify the server is registered:
 claude mcp list
 ```
 
-### Option 2 — JSON configuration
+#### Option 2 — JSON configuration
 
 Add to `~/.claude.json` under `mcpServers`:
 
@@ -42,7 +48,7 @@ Add to `~/.claude.json` under `mcpServers`:
 
 > **Note:** Both `"type": "stdio"` and `"env": {}` are required fields.
 
-### Starting the server manually
+#### Starting the server manually
 
 ```bash
 source .venv/bin/activate
@@ -50,6 +56,51 @@ cometblue-control mcp
 ```
 
 The server reads from stdin and writes to stdout — it is started automatically by Claude Code when needed.
+
+---
+
+### Remote (HTTP/SSE transport)
+
+Use this when the thermostat hardware (Bluetooth adapter) is on a different machine (e.g. a Raspberry Pi) and you want to control it from another device.
+
+#### 1. Start the server on the host machine
+
+```bash
+cometblue-control mcp --transport http --host 0.0.0.0 --port 9090
+```
+
+The SSE endpoint is now available at `http://<host>:9090/sse`.
+
+#### 2. Connect Claude Code to the remote server
+
+```bash
+claude mcp add cometblue --transport sse --url http://192.168.1.100:9090/sse
+```
+
+Or via JSON configuration in `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "cometblue": {
+      "type": "sse",
+      "url": "http://192.168.1.100:9090/sse"
+    }
+  }
+}
+```
+
+Replace `192.168.1.100` with the IP address of your host machine.
+
+#### Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--transport` | `stdio` | `stdio` or `http` |
+| `--host` | `0.0.0.0` | Bind address (HTTP only) |
+| `--port` / `-p` | `9090` | Port (HTTP only) |
+
+> **Security note:** The HTTP server has no built-in authentication. Run it only on a trusted local network, or place it behind a reverse proxy with TLS and authentication.
 
 ---
 

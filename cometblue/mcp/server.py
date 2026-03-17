@@ -1,10 +1,11 @@
-"""MCP server for CometBlue Control (stdio transport)."""
+"""MCP server for CometBlue Control (stdio and HTTP/SSE transport)."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
@@ -358,3 +359,38 @@ async def run():
     server = create_server()
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
+
+
+async def run_http(host: str = "0.0.0.0", port: int = 9090):
+    """Run the MCP server over HTTP with SSE transport."""
+    import uvicorn
+    from mcp.server.sse import SseServerTransport
+    from starlette.applications import Starlette
+    from starlette.routing import Mount, Route
+
+    config.load()
+
+    mcp_server = create_server()
+    sse = SseServerTransport("/messages/")
+
+    async def handle_sse(request):
+        async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
+            await mcp_server.run(streams[0], streams[1], mcp_server.create_initialization_options())
+
+    @asynccontextmanager
+    async def lifespan(app):
+        await db.init_db()
+        yield
+
+    app = Starlette(
+        lifespan=lifespan,
+        routes=[
+            Route("/sse", endpoint=handle_sse),
+            Mount("/messages/", app=sse.handle_post_message),
+        ],
+    )
+
+    uv_config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    uv_server = uvicorn.Server(uv_config)
+    log.info("MCP HTTP/SSE server starting on http://%s:%d/sse", host, port)
+    await uv_server.serve()

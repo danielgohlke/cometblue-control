@@ -58,14 +58,28 @@ def serve(host, port, reload):
 
 
 @cli.command()
-def mcp():
-    """Start the MCP server (stdio transport for Claude integration)."""
+@click.option(
+    "--transport",
+    default="stdio",
+    type=click.Choice(["stdio", "http"]),
+    show_default=True,
+    help="Transport type: stdio (local) or http (remote SSE)",
+)
+@click.option("--host", default="0.0.0.0", show_default=True, help="Bind host (HTTP transport only)")
+@click.option("--port", "-p", default=9090, type=int, show_default=True, help="Port (HTTP transport only)")
+def mcp(transport, host, port):
+    """Start the MCP server (stdio or HTTP/SSE transport)."""
     try:
-        from .mcp.server import run
+        if transport == "stdio":
+            from .mcp.server import run
+            asyncio.run(run())
+        else:
+            from .mcp.server import run_http
+            click.echo(f"Starting MCP HTTP/SSE server on http://{host}:{port}/sse")
+            asyncio.run(run_http(host=host, port=port))
     except ImportError:
         click.echo("MCP SDK not installed. Run: pip install 'cometblue-control[mcp]'", err=True)
         sys.exit(1)
-    asyncio.run(run())
 
 
 @cli.command()
