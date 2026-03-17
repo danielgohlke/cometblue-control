@@ -54,8 +54,9 @@ IS_LINUX = sys.platform.startswith("linux")
 
 # Timeouts differ by platform:
 #   macOS — CoreBluetooth service discovery is fast (~5 s)
-#   Linux — BlueZ service discovery is slower; Pi 3B+ can take 30+ s
-CONNECT_TIMEOUT = 15.0 if IS_MACOS else 45.0
+#   Linux — BlueZ service discovery is slower; Pi 3B+ can take 30+ s on first
+#           connect, but dangerous_use_bleak_cache=True skips it on subsequent ones
+CONNECT_TIMEOUT = 15.0 if IS_MACOS else 30.0
 OP_TIMEOUT = 10.0
 
 # BlueZ only supports one BLE operation at a time — serialize all connections.
@@ -162,7 +163,7 @@ class CometBlueDevice:
         kwargs = {"timeout": CONNECT_TIMEOUT}
         try:
             self._client = BleakClient(self.address, **kwargs)
-            await self._client.connect()
+            await asyncio.wait_for(self._client.connect(), timeout=CONNECT_TIMEOUT)
         except BleakError as e:
             if self._mac_address and "not found" in str(e).lower():
                 log.info(
@@ -178,7 +179,7 @@ class CometBlueDevice:
                     )
                     self.address = found.address
                     self._client = BleakClient(self.address, **kwargs)
-                    await self._client.connect()
+                    await asyncio.wait_for(self._client.connect(), timeout=CONNECT_TIMEOUT)
                 else:
                     raise
             else:
@@ -200,7 +201,9 @@ class CometBlueDevice:
             kwargs["adapter"] = self._adapter
         try:
             self._client = BleakClient(self.address, **kwargs)
-            await self._client.connect(dangerous_use_bleak_cache=True)
+            await asyncio.wait_for(
+                self._client.connect(dangerous_use_bleak_cache=True), timeout=CONNECT_TIMEOUT
+            )
         except BleakError as e:
             if self._mac_address and "not found" in str(e).lower():
                 log.info(
@@ -216,7 +219,9 @@ class CometBlueDevice:
                     )
                     self.address = found.address
                     self._client = BleakClient(self.address, **kwargs)
-                    await self._client.connect(dangerous_use_bleak_cache=True)
+                    await asyncio.wait_for(
+                        self._client.connect(dangerous_use_bleak_cache=True), timeout=CONNECT_TIMEOUT
+                    )
                 else:
                     raise
             else:

@@ -241,23 +241,7 @@ async def _dispatch(name: str, args: dict) -> Any:
         else:
             addresses = [a.upper() for a in devices_arg]
         results = await prof.apply_profile(profile_name, addresses, apply_schedules=args.get("apply_schedules", True), adapter=adapter)
-
-        # Warn about active manual overrides that will override the profile
-        warnings = []
-        for address in addresses:
-            status = await db.get_status(address)
-            if status and status.get("temp_manual") is not None:
-                device = await db.get_device(address)
-                name_str = device.get("name", address) if device else address
-                warnings.append(
-                    f"{name_str} hat einen aktiven manuellen Override ({status['temp_manual']}°C) — "
-                    "dieser übersteuert das Profil bis er zurückgesetzt wird."
-                )
-
-        response = {"profile": profile_name, "results": results}
-        if warnings:
-            response["warnings"] = warnings
-        return response
+        return {"profile": profile_name, "results": results}
 
     elif name == "discover_devices":
         timeout = args.get("timeout", 10.0)

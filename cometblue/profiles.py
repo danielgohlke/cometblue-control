@@ -117,10 +117,11 @@ async def apply_profile(
             _adapter = adapter or (device_cfg.get("adapter") if device_cfg else None)
 
             async with CometBlueDevice(address, pin=pin, mac_address=mac_address, adapter=_adapter) as dev:
-                # Set temperatures
+                # Set temperatures and reset any manual override back to eco setpoint
                 await dev.set_temperatures(
                     comfort=profile.get("comfort_temp"),
                     eco=profile.get("eco_temp"),
+                    manual=profile.get("eco_temp"),
                     offset=cached_offset,
                 )
 
@@ -135,6 +136,15 @@ async def apply_profile(
                     for i, day_name in enumerate(DAY_NAMES, start=1):
                         if day_name in schedules:
                             await dev.set_day_schedule(i, schedules[day_name])
+
+            # Update DB cache to reflect reset manual override
+            if status:
+                status["temp_manual"] = profile.get("eco_temp")
+                if profile.get("comfort_temp") is not None:
+                    status["temp_comfort"] = profile["comfort_temp"]
+                if profile.get("eco_temp") is not None:
+                    status["temp_eco"] = profile["eco_temp"]
+                await db.save_status(address, status)
 
             results[address] = "ok"
             log.info("Profile '%s' applied to %s", name, address)

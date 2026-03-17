@@ -6,35 +6,35 @@ schedules:
   friday:
   - end: '12:00'
     start: 07:00
-  - end: '19:00'
+  - end: '21:00'
     start: '12:10'
   monday:
   - end: '12:00'
     start: 07:00
-  - end: '19:00'
+  - end: '21:00'
     start: '12:10'
   saturday:
   - end: '12:00'
     start: 07:00
-  - end: '19:00'
+  - end: '21:00'
     start: '12:10'
   sunday:
   - end: '12:00'
     start: 07:00
-  - end: '19:00'
+  - end: '21:00'
     start: '12:10'
   thursday:
   - end: '12:00'
     start: 07:00
-  - end: '19:00'
+  - end: '21:00'
     start: '12:10'
   tuesday:
   - end: '12:00'
     start: 07:00
-  - end: '19:00'
+  - end: '21:00'
     start: '12:10'
   wednesday:
   - end: '12:00'
     start: 07:00
-  - end: '19:00'
+  - end: '21:00'
     start: '12:10'
