@@ -379,15 +379,16 @@ async def run_http(host: str = "0.0.0.0", port: int = 9090):
     import uvicorn
     from mcp.server.sse import SseServerTransport
     from starlette.applications import Starlette
-    from starlette.routing import Mount, Route
+    from starlette.routing import Mount
+    from starlette.types import Receive, Scope, Send
 
     config.load()
 
     mcp_server = create_server()
     sse = SseServerTransport("/messages/")
 
-    async def handle_sse(request):
-        async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
+    async def handle_sse(scope: Scope, receive: Receive, send: Send) -> None:
+        async with sse.connect_sse(scope, receive, send) as streams:
             await mcp_server.run(streams[0], streams[1], mcp_server.create_initialization_options())
 
     @asynccontextmanager
@@ -398,7 +399,7 @@ async def run_http(host: str = "0.0.0.0", port: int = 9090):
     app = Starlette(
         lifespan=lifespan,
         routes=[
-            Route("/sse", endpoint=handle_sse),
+            Mount("/sse", app=handle_sse),
             Mount("/messages/", app=sse.handle_post_message),
         ],
     )
