@@ -39,7 +39,7 @@ def create_server() -> Server:
             ),
             types.Tool(
                 name="get_device_status",
-                description="Get the current status (temperature, battery) of a specific device.",
+                description="Get the live status (temperature, battery) of a specific device via BLE.",
                 inputSchema={
                     "type": "object",
                     "required": ["address"],
@@ -214,12 +214,9 @@ async def _dispatch(name: str, args: dict) -> Any:
 
     elif name == "get_device_status":
         address = args["address"].upper()
-        status = await db.get_status(address)
-        if not status:
-            # Try live poll
-            device = await db.get_device(address)
-            pin = device.get("pin") if device else None
-            status = await poll_device(address, pin=pin, adapter=adapter)
+        device = await db.get_device(address)
+        pin = device.get("pin") if device else None
+        status = await poll_device(address, pin=pin, adapter=adapter)
         return status
 
     elif name == "set_temperature":
