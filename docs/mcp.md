@@ -206,7 +206,7 @@ List all configured devices with last known temperature and battery.
 ---
 
 ### `get_device_status`
-Get current status for a specific device (cached — no BLE required).
+Get live status for a specific device via BLE.
 
 **Input:** `{ "address": "XXXXXXXX-..." }`
 
@@ -441,7 +441,8 @@ Apply the "Wohnung Frühling" scenario
 
 ## Notes
 
-- `list_devices` and `get_device_status` read from the SQLite cache — **no BLE connection required**
+- `list_devices` reads from the SQLite cache — **no BLE connection required**
+- `get_device_status` performs a **live BLE poll** for accurate current values
 - All other tools that interact with devices (`set_temperature`, `get_schedule`, etc.) **require an active BLE connection** to the device
 - The MCP server and REST API server share the same database and can run simultaneously
 - Background polling runs via APScheduler — the MCP server does not start the scheduler (only the REST API server does)
