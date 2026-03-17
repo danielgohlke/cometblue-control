@@ -12,6 +12,8 @@
     service_user: "{{ ansible_user }}"
     config_dir: "/home/{{ ansible_user }}/.cometblue"
     port: 8080
+    install_mcp: false      # MCP HTTP-Server installieren? true/false
+    mcp_port: 9090          # Port für den MCP SSE-Endpoint
 
   tasks:
 
@@ -103,6 +105,15 @@
         virtualenv: "{{ install_dir }}/.venv"
         virtualenv_command: python3 -m venv
       become_user: "{{ service_user }}"
+      tags: [setup, update]
+
+    - name: MCP-Extra installieren
+      pip:
+        name: "{{ install_dir }}[mcp]"
+        extra_args: "-e"
+        virtualenv: "{{ install_dir }}/.venv"
+      become_user: "{{ service_user }}"
+      when: install_mcp | bool
       tags: [setup, update]
 
     # ── TLS-Zertifikat (self-signed) ───────────────────────────────
@@ -222,6 +233,33 @@
         name: cometblue
         state: restarted
         daemon_reload: true
+      tags: [update]
+
+    # ── MCP HTTP-Service (optional) ────────────────────────────────
+    - name: MCP systemd-Unit installieren
+      template:
+        src: cometblue-mcp.service.j2
+        dest: /etc/systemd/system/cometblue-mcp.service
+        mode: "0644"
+      when: install_mcp | bool
+      notify: systemd reload
+      tags: [setup, update]
+
+    - name: MCP-Service aktivieren und starten
+      systemd:
+        name: cometblue-mcp
+        enabled: true
+        state: started
+        daemon_reload: true
+      when: install_mcp | bool
+      tags: [setup]
+
+    - name: MCP-Service neu starten (nach Update)
+      systemd:
+        name: cometblue-mcp
+        state: restarted
+        daemon_reload: true
+      when: install_mcp | bool
       tags: [update]
 
   handlers:
