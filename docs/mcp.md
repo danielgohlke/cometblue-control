@@ -74,7 +74,7 @@ The SSE endpoint is now available at `http://<host>:9090/sse`.
 #### 2. Connect Claude Code to the remote server
 
 ```bash
-claude mcp add cometblue --transport sse --url http://192.168.1.100:9090/sse
+claude mcp add --transport sse cometblue http://192.168.1.100:9090/sse
 ```
 
 Or via JSON configuration in `~/.claude.json`:
@@ -101,6 +101,28 @@ Replace `192.168.1.100` with the IP address of your host machine.
 | `--port` / `-p` | `9090` | Port (HTTP only) |
 
 > **Security note:** The HTTP server has no built-in authentication. Run it only on a trusted local network, or place it behind a reverse proxy with TLS and authentication.
+
+#### Deploy via Ansible
+
+The Ansible playbook in `deploy/deploy.yml` can install and manage the MCP service automatically:
+
+```bash
+# Deploy with MCP enabled
+ansible-playbook -i deploy/inventory.ini deploy/deploy.yml -e install_mcp=true
+
+# Update after code changes
+ansible-playbook -i deploy/inventory.ini deploy/deploy.yml --tags update -e install_mcp=true
+
+# Custom port
+ansible-playbook -i deploy/inventory.ini deploy/deploy.yml -e install_mcp=true -e mcp_port=8765
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `install_mcp` | `true` | Install and start the MCP HTTP service |
+| `mcp_port` | `9090` | Port for the SSE endpoint |
+
+The playbook installs the `mcp` extra (`pip install -e '.[mcp]'`) and deploys a `cometblue-mcp.service` systemd unit alongside the existing `cometblue.service`.
 
 ---
 

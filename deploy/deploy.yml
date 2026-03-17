@@ -12,7 +12,7 @@
     service_user: "{{ ansible_user }}"
     config_dir: "/home/{{ ansible_user }}/.cometblue"
     port: 8080
-    install_mcp: false      # MCP HTTP-Server installieren? true/false
+    install_mcp: true       # MCP HTTP-Server installieren? true/false
     mcp_port: 9090          # Port für den MCP SSE-Endpoint
 
   tasks:
