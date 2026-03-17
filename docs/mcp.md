@@ -256,6 +256,8 @@ Apply a heating profile to one or all devices.
 
 **Output:** `{ "profile": "winter", "results": { "XXXXXXXX-...": "ok" } }`
 
+If any device has an active manual override (`temp_manual`), the response includes a `warnings` list — the override takes precedence over the profile until it is cleared.
+
 ---
 
 ### `list_profiles`
