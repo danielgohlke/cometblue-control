@@ -94,6 +94,7 @@ async def apply_profile(
     name: str,
     device_addresses: list[str],
     apply_schedules: bool = True,
+    adapter: Optional[str] = None,
 ) -> dict[str, str]:
     """
     Apply a profile to the given devices.
@@ -113,8 +114,9 @@ async def apply_profile(
             status = await db.get_status(address)
             cached_offset = (status or {}).get("temp_offset") or 0.0
             mac_address = device_cfg.get("mac_address") if device_cfg else None
+            _adapter = adapter or (device_cfg.get("adapter") if device_cfg else None)
 
-            async with CometBlueDevice(address, pin=pin, mac_address=mac_address) as dev:
+            async with CometBlueDevice(address, pin=pin, mac_address=mac_address, adapter=_adapter) as dev:
                 # Set temperatures
                 await dev.set_temperatures(
                     comfort=profile.get("comfort_temp"),

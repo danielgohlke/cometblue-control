@@ -243,7 +243,7 @@ async def _dispatch(name: str, args: dict) -> Any:
             addresses = [d["address"] for d in all_devs]
         else:
             addresses = [a.upper() for a in devices_arg]
-        results = await prof.apply_profile(profile_name, addresses, apply_schedules=args.get("apply_schedules", True))
+        results = await prof.apply_profile(profile_name, addresses, apply_schedules=args.get("apply_schedules", True), adapter=adapter)
         return {"profile": profile_name, "results": results}
 
     elif name == "discover_devices":

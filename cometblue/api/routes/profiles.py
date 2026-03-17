@@ -77,7 +77,8 @@ async def apply_profile(name: str, body: models.ProfileApply):
                 cached_offset = (status or {}).get("temp_offset") or 0.0
                 pin = device_cfg.get("pin") if device_cfg else None
                 mac_address = device_cfg.get("mac_address") if device_cfg else None
-                async with CometBlueDevice(address, pin=pin, mac_address=mac_address) as dev:
+                _adapter = device_cfg.get("adapter") if device_cfg else None
+                async with CometBlueDevice(address, pin=pin, mac_address=mac_address, adapter=_adapter) as dev:
                     await dev.set_temperatures(
                         comfort=profile_data.get("comfort_temp"),
                         eco=profile_data.get("eco_temp"),
