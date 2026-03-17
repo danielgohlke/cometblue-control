@@ -378,31 +378,33 @@ async def run_http(host: str = "0.0.0.0", port: int = 9090):
     """Run the MCP server over HTTP with SSE transport."""
     import uvicorn
     from mcp.server.sse import SseServerTransport
-    from starlette.applications import Starlette
-    from starlette.routing import Mount
-    from starlette.types import Receive, Scope, Send
 
     config.load()
 
     mcp_server = create_server()
     sse = SseServerTransport("/messages/")
 
-    async def handle_sse(scope: Scope, receive: Receive, send: Send) -> None:
+    async def handle_sse(scope, receive, send):
         async with sse.connect_sse(scope, receive, send) as streams:
             await mcp_server.run(streams[0], streams[1], mcp_server.create_initialization_options())
 
-    @asynccontextmanager
-    async def lifespan(app):
+    async def handle_lifespan(scope, receive, send):
+        message = await receive()
+        assert message["type"] == "lifespan.startup"
         await db.init_db()
-        yield
+        await send({"type": "lifespan.startup.complete"})
+        message = await receive()
+        assert message["type"] == "lifespan.shutdown"
+        await send({"type": "lifespan.shutdown.complete"})
 
-    app = Starlette(
-        lifespan=lifespan,
-        routes=[
-            Mount("/sse", app=handle_sse),
-            Mount("/messages/", app=sse.handle_post_message),
-        ],
-    )
+    async def app(scope, receive, send):
+        path = scope.get("path", "")
+        if scope["type"] == "lifespan":
+            await handle_lifespan(scope, receive, send)
+        elif path in ("/sse", "/sse/"):
+            await handle_sse(scope, receive, send)
+        elif path.startswith("/messages/"):
+            await sse.handle_post_message(scope, receive, send)
 
     uv_config = uvicorn.Config(app, host=host, port=port, log_level="info")
     uv_server = uvicorn.Server(uv_config)
