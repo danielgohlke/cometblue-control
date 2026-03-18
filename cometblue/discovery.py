@@ -24,6 +24,8 @@ IS_MACOS = sys.platform == "darwin"
 SCAN_TIMEOUT = 10.0
 VERIFY_TIMEOUT = 8.0
 
+_scan_lock = asyncio.Lock()
+
 
 def _scanner_kwargs(adapter: Optional[str] = None) -> dict:
     """Build BleakScanner kwargs — omits 'adapter' on macOS (not supported)."""
@@ -62,7 +64,8 @@ async def scan(timeout: float = SCAN_TIMEOUT, adapter: Optional[str] = None) -> 
     kwargs = _scanner_kwargs(adapter)
     kwargs["timeout"] = timeout
 
-    devices = await BleakScanner.discover(**kwargs)
+    async with _scan_lock:
+        devices = await BleakScanner.discover(**kwargs)
 
     candidates = []
     for d in devices:
@@ -113,22 +116,29 @@ async def scan_streaming(
             queue.put_nowait(DiscoveredDevice(address=device.address, name=name, rssi=rssi))
             log.debug("Streaming candidate: %s (%s)", name, device.address)
 
+    if _scan_lock.locked():
+        log.warning("BLE scan already in progress, rejecting concurrent request")
+        yield ("error", "scan_in_progress")
+        return
+
     kwargs = _scanner_kwargs(adapter)
     scanner = BleakScanner(detection_callback=_on_device, **kwargs)
-    await scanner.start()
-    log.info("Streaming BLE scan started (%.1fs)", timeout)
 
-    tick = 0.5
-    elapsed = 0.0
-    try:
-        while elapsed < timeout:
-            await asyncio.sleep(tick)
-            elapsed = min(elapsed + tick, timeout)
-            yield ("progress", elapsed)
-            while not queue.empty():
-                yield ("device", queue.get_nowait())
-    finally:
-        await scanner.stop()
+    async with _scan_lock:
+        await scanner.start()
+        log.info("Streaming BLE scan started (%.1fs)", timeout)
+
+        tick = 0.5
+        elapsed = 0.0
+        try:
+            while elapsed < timeout:
+                await asyncio.sleep(tick)
+                elapsed = min(elapsed + tick, timeout)
+                yield ("progress", elapsed)
+                while not queue.empty():
+                    yield ("device", queue.get_nowait())
+        finally:
+            await scanner.stop()
 
     # Drain any last-moment discoveries
     while not queue.empty():
@@ -142,6 +152,52 @@ async def scan_streaming(
         _, mac = await _verify_device(addr, adapter)
         if mac:
             yield ("mac", DiscoveredDevice(address=addr, name="", mac_address=mac))
+
+
+async def scan_locator(
+    adapter: Optional[str] = None,
+) -> AsyncGenerator[Tuple[str, object], None]:
+    """
+    Async generator for continuous RSSI locator — runs until the generator is closed.
+    Yields a sorted RSSI snapshot every second.
+
+      ("rssi",  list[dict])  — sorted by RSSI desc, each: {address, name, rssi}
+      ("error", str)         — if scan can't start (e.g. already in progress)
+    """
+    if _scan_lock.locked():
+        log.warning("BLE locator: scan already in progress, rejecting")
+        yield ("error", "scan_in_progress")
+        return
+
+    devices_seen: dict[str, dict] = {}
+
+    def _on_device(device, adv_data):
+        name = (device.name or "").strip()
+        if "comet" in name.lower() or "blue" in name.lower():
+            rssi = getattr(adv_data, "rssi", None) or getattr(device, "rssi", None)
+            devices_seen[device.address] = {
+                "address": device.address,
+                "name": name,
+                "rssi": rssi,
+            }
+
+    kwargs = _scanner_kwargs(adapter)
+    scanner = BleakScanner(detection_callback=_on_device, **kwargs)
+
+    async with _scan_lock:
+        await scanner.start()
+        log.info("Locator scan started")
+        try:
+            while True:
+                await asyncio.sleep(1.0)
+                yield ("rssi", sorted(
+                    devices_seen.values(),
+                    key=lambda d: (d["rssi"] or -999),
+                    reverse=True,
+                ))
+        finally:
+            await scanner.stop()
+            log.info("Locator scan stopped")
 
 
 async def find_by_mac(mac: str, timeout: float = SCAN_TIMEOUT,

@@ -658,7 +658,7 @@
             <option value="60">60 s</option>
           </select>
         </label>
-        <button @click="runDiscovery()" :disabled="discovering"
+        <button @click="runDiscovery()" :disabled="discovering || locating"
           class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
           <svg x-show="discovering" class="spinner w-4 h-4" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -709,6 +709,55 @@
       <span x-text="t('discovery_press_scan')"></span> <strong x-text="t('discovery_scan_btn')"></strong> <span x-text="t('discovery_press_scan2')"></span>
     </div>
     <div x-show="scanDone && discovered.length === 0" class="text-gray-400 italic mt-2" x-text="t('discovery_no_found')"></div>
+
+    <!-- ── Locator ── -->
+    <div class="mt-6 border-t border-gray-100 pt-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide" x-text="t('locator_title')"></h2>
+          <p class="text-xs text-gray-400 mt-0.5" x-text="t('locator_hint')"></p>
+        </div>
+        <button @click="locating ? stopLocator() : startLocator()" :disabled="discovering"
+          class="px-4 py-1.5 rounded text-sm flex items-center gap-2 disabled:opacity-50"
+          :class="locating ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-indigo-600 text-white hover:bg-indigo-700'">
+          <svg x-show="locating" class="spinner w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          <span x-text="locating ? t('locator_stop') : t('locator_start')"></span>
+        </button>
+      </div>
+
+      <div x-show="locating && locatorDevices.length === 0" class="text-gray-400 italic text-sm" x-text="t('locator_waiting')"></div>
+
+      <div x-show="locatorDevices.length > 0" class="space-y-2">
+        <template x-for="d in locatorDevices" :key="d.address">
+          <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex items-center gap-4"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100">
+            <!-- Signal bars -->
+            <div class="flex items-end gap-[3px] flex-shrink-0 pb-0.5">
+              <div class="w-2 rounded-sm transition-colors duration-300" :class="rssiBarColor(d.rssi, 1)" style="height:6px"></div>
+              <div class="w-2 rounded-sm transition-colors duration-300" :class="rssiBarColor(d.rssi, 2)" style="height:10px"></div>
+              <div class="w-2 rounded-sm transition-colors duration-300" :class="rssiBarColor(d.rssi, 3)" style="height:14px"></div>
+              <div class="w-2 rounded-sm transition-colors duration-300" :class="rssiBarColor(d.rssi, 4)" style="height:18px"></div>
+            </div>
+            <!-- Device info -->
+            <div class="flex-1 min-w-0">
+              <div class="font-medium truncate" x-text="d.label || d.name"></div>
+              <div x-show="d.label && d.label !== d.name" class="text-xs text-gray-400 truncate" x-text="d.name"></div>
+              <div class="text-xs font-mono text-gray-400 truncate" x-text="d.address"></div>
+            </div>
+            <!-- RSSI value -->
+            <div class="flex-shrink-0 text-right">
+              <div class="font-bold text-lg tabular-nums transition-colors duration-300" :class="rssiColor(d.rssi)" x-text="d.rssi != null ? d.rssi + ' dBm' : '—'"></div>
+              <div class="text-xs text-gray-400" x-text="rssiLevel(d.rssi) === 4 ? t('rssi_excellent') : rssiLevel(d.rssi) === 3 ? t('rssi_good') : rssiLevel(d.rssi) === 2 ? t('rssi_fair') : t('rssi_weak')"></div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
 
     <!-- Live scan results -->
     <div x-show="discovered.length > 0">
@@ -1537,6 +1586,16 @@ const TRANSLATIONS = {
     discovery_add_device: 'Hinzufügen',
     discovery_assign_btn: '🔗 Zuordnen…',
     discovery_assign_title: 'Nur nötig wenn MAC-Auflösung nicht funktioniert. Normalfall: Gerät hinzufügen → Poll → UUID wird automatisch aktuell gehalten.',
+    locator_title: 'Signalstärken-Locator',
+    locator_hint: 'Live-RSSI zum Finden von Thermostaten — läuft bis zum Stopp',
+    locator_start: '📡 Locator starten',
+    locator_stop: 'Stopp',
+    locator_waiting: 'Scan läuft… warte auf Geräte',
+    locator_error: 'Locator-Fehler',
+    rssi_excellent: 'Ausgezeichnet',
+    rssi_good: 'Gut',
+    rssi_fair: 'Schwach',
+    rssi_weak: 'Sehr schwach',
 
     // Set Temperature modal
     modal_set_temp_title: '🌡 Temperaturen setzen',
@@ -1854,6 +1913,16 @@ const TRANSLATIONS = {
     discovery_add_device: 'Add',
     discovery_assign_btn: '🔗 Assign…',
     discovery_assign_title: 'Only needed as fallback if MAC resolution fails. Normal case: Add device → Poll → UUID is kept automatically.',
+    locator_title: 'Signal Strength Locator',
+    locator_hint: 'Live RSSI for finding thermostats — runs until stopped',
+    locator_start: '📡 Start Locator',
+    locator_stop: 'Stop',
+    locator_waiting: 'Scanning… waiting for devices',
+    locator_error: 'Locator error',
+    rssi_excellent: 'Excellent',
+    rssi_good: 'Good',
+    rssi_fair: 'Fair',
+    rssi_weak: 'Weak',
 
     // Set Temperature modal
     modal_set_temp_title: '🌡 Set Temperatures',
@@ -2069,6 +2138,11 @@ function app() {
     scanElapsed: 0,
     scanProgress: 0,
     _scanEs: null,
+
+    // Locator
+    locating: false,
+    locatorDevices: [],
+    _locatorEs: null,
 
     // Per-device BLE busy state: { address: 'message' }
     busyDevices: {},
@@ -2588,6 +2662,56 @@ function app() {
         this.scanDone = true;
         if (!this.discovered.length) this.showToast('Scan error — check Bluetooth.');
       };
+    },
+
+    startLocator() {
+      if (this.locating) return;
+      if (this._locatorEs) { this._locatorEs.close(); this._locatorEs = null; }
+      this.locating = true;
+      this.locatorDevices = [];
+      const es = new EventSource(`${API}/api/discovery/locator`);
+      this._locatorEs = es;
+      es.addEventListener('rssi', (e) => {
+        this.locatorDevices = JSON.parse(e.data);
+      });
+      es.addEventListener('error', (e) => {
+        if (e.data) {
+          try { this.showToast(t('locator_error') + ': ' + JSON.parse(e.data).message); } catch(_) {}
+        }
+        this.stopLocator();
+      });
+      es.onerror = () => {
+        if (es.readyState === EventSource.CLOSED) this.stopLocator();
+      };
+    },
+
+    stopLocator() {
+      if (this._locatorEs) { this._locatorEs.close(); this._locatorEs = null; }
+      this.locating = false;
+    },
+
+    rssiLevel(rssi) {
+      if (!rssi) return 0;
+      if (rssi >= -60) return 4;
+      if (rssi >= -70) return 3;
+      if (rssi >= -80) return 2;
+      return 1;
+    },
+
+    rssiColor(rssi) {
+      if (!rssi) return 'text-gray-400';
+      if (rssi >= -60) return 'text-green-600';
+      if (rssi >= -70) return 'text-yellow-500';
+      if (rssi >= -80) return 'text-orange-500';
+      return 'text-red-500';
+    },
+
+    rssiBarColor(rssi, bar) {
+      if (!rssi || this.rssiLevel(rssi) < bar) return 'bg-gray-200';
+      if (rssi >= -60) return 'bg-green-500';
+      if (rssi >= -70) return 'bg-yellow-500';
+      if (rssi >= -80) return 'bg-orange-400';
+      return 'bg-red-500';
     },
 
     isConfigured(address) {

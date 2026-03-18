@@ -481,11 +481,11 @@ Execute a trigger immediately (ignores schedule).
 
 ## Discovery
 
-### `POST /api/discovery/scan?timeout=10`
-BLE scan — returns a **Server-Sent Events** stream of found devices.
+### `GET /api/discovery/stream?timeout=10`
+BLE scan — returns a **Server-Sent Events** stream of found devices. Ends after `timeout` seconds.
 
 ```bash
-curl -N "http://localhost:8080/api/discovery/scan?timeout=15"
+curl -N "http://localhost:8080/api/discovery/stream?timeout=15"
 ```
 
 **SSE Events:**
@@ -498,7 +498,41 @@ data: {"elapsed": 3.5, "total": 15.0}
 
 event: done
 data: {"found": 7}
+
+event: error
+data: {"message": "scan_in_progress"}
 ```
+
+**Query parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `timeout` | `10.0` | Scan duration in seconds (3–60) |
+
+### `GET /api/discovery/locator`
+Continuous RSSI locator — streams sorted RSSI snapshots every second until the client disconnects. Useful for physically locating thermostats by walking towards the strongest signal.
+
+> Only one BLE scan can run at a time. Starting the locator while a regular scan is active (or vice versa) returns an `error` event.
+
+```bash
+curl -N "http://localhost:8080/api/discovery/locator"
+```
+
+**SSE Events:**
+```
+event: rssi
+data: [
+  {"address": "XXXXXXXX-...", "name": "Comet Blue", "rssi": -65, "label": "Küche"},
+  {"address": "YYYYYYYY-...", "name": "Comet Blue", "rssi": -78, "label": null}
+]
+
+event: error
+data: {"message": "scan_in_progress"}
+```
+
+Each `rssi` event contains all currently seen CometBlue devices, sorted strongest-first. `label` is the configured device name from the database (or `null` if not yet added).
+
+Close the connection (Ctrl-C / disconnect) to stop the scan.
 
 ### `GET /api/discovery/known`
 All devices ever found via scan (persisted in DB).

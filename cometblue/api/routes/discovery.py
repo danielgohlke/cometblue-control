@@ -103,5 +103,46 @@ async def stream_scan(
                     "event": "done",
                     "data": json.dumps({"found": found_count}),
                 }
+            elif event_type == "error":
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"message": data}),
+                }
+
+    return EventSourceResponse(generator())
+
+
+@router.get("/locator")
+async def locator_stream():
+    """
+    SSE stream — continuously scans BLE and emits RSSI snapshots every second.
+    Runs until the client disconnects (no timeout).
+
+    Event types:
+    - `rssi`   — sorted list of {address, name, rssi, label}
+    - `error`  — {"message": "..."}
+    """
+    cfg = config.get()
+    adapter = cfg.get("bluetooth", {}).get("adapter")
+
+    async def generator():
+        all_devices = await db.list_devices(active_only=False)
+        addr_to_label = {dev["address"].upper(): dev["name"] for dev in all_devices}
+
+        async for event_type, data in discovery.scan_locator(adapter=adapter):
+            if event_type == "rssi":
+                devices = [
+                    {**d, "label": addr_to_label.get(d["address"].upper())}
+                    for d in data
+                ]
+                yield {
+                    "event": "rssi",
+                    "data": json.dumps(devices),
+                }
+            elif event_type == "error":
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"message": data}),
+                }
 
     return EventSourceResponse(generator())

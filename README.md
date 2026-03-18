@@ -26,6 +26,10 @@ Cross-platform management system for **CometBlue / Comet Blue**, **Xavax Hama**,
 |--------|-----------|
 | ![Devices](docs/screenshots/devices.png) | ![Discovery](docs/screenshots/discovery.png) |
 
+| Entdecken + Locator | Locator aktiv |
+|---------------------|--------------|
+| ![Discovery](docs/screenshots/locator.png) | ![Locator aktiv](docs/screenshots/locator%20action.png) |
+
 | Temperaturen setzen | Heizzeiten setzen |
 |--------------------|-------------------|
 | ![Set Temp](docs/screenshots/set%20temp%20edit.png) | ![Set Heattime](docs/screenshots/set%20heattime%20edit.png) |
@@ -54,7 +58,7 @@ Provides a REST API, optional Web UI, MCP server (for AI integration), and CLI �
 
 ## Features
 
-- **Automatic BLE discovery** — scans and identifies CometBlue devices
+- **Automatic BLE discovery** — scans and identifies CometBlue devices; live **Signal Strength Locator** shows RSSI for all nearby thermostats in real time (continuous scan with stop button, sorted by signal strength)
 - **Full thermostat control** — temperatures, weekly schedules, holiday slots, time sync
 - **Child lock control** — toggle per device or bulk-set all devices at once; optionally part of a profile
 - **Background polling** — regularly reads all configured devices (configurable interval, on/off toggle persisted in DB)
@@ -373,7 +377,7 @@ Start the server and open **http://localhost:8080**.
 | **Devices** | Full device list — poll, set temps, schedules, child lock, rename, reset data |
 | **Profiles** | View, create, edit and apply heating profiles with schedule and child lock settings |
 | **Scenes** | Named scenes: assign one profile per device, apply all at once with live progress bar |
-| **Discovery** | BLE scan, add found devices with one click |
+| **Discovery** | BLE scan, add found devices with one click; built-in **Signal Strength Locator** for finding thermostats by proximity |
 
 ### Nav bar
 
@@ -458,7 +462,8 @@ PUT|DELETE        /api/auto-triggers/{id}
 POST              /api/auto-triggers/{id}/run
 
 # Discovery
-POST              /api/discovery/scan               SSE stream of found devices
+GET               /api/discovery/stream             SSE stream of found devices (with timeout)
+GET               /api/discovery/locator            SSE stream: continuous RSSI locator (runs until disconnect)
 GET               /api/discovery/known              Persisted scan results
 
 # History
